@@ -1,14 +1,14 @@
 #include <string.h>
 
-typedef struct __AST{
+typedef struct __TOKEN{
     int token_type;
     long val;
     union{
-        char *name;
+        char *name; // including literal
     };
-} AST;
+} Token;
 
-enum Token{
+enum TokenType{
     OPEN_BRACE, // {
     CLOSE_BRACE, // }
     OPEN_BRACKET, // [
@@ -21,13 +21,14 @@ enum Token{
     LITERAL, // literal
 };
 
-enum Keyword{
+enum KeywordType{
     KEYWORD_return,
     KEYWORD_int,
     KEYWORD_unknown,
 };
 
-enum Keyword is_keyword(char *word){
+enum KeywordType is_keyword(char *word){
     if(!strcmp(word, "return")) return KEYWORD_return;
     if(!strcmp(word, "INT")) return KEYWORD_int;
+    return KEYWORD_unknown;
 };

@@ -9,9 +9,9 @@
 #define MAX_CODE 0x1000
 #define BUF_SIZE 0x80
 
+Token tokens[MAX_CODE];
 char code[MAX_CODE];
 
-AST tokens[MAX_CODE];
 
 int lex(char code[]){
   int token_counter = 0, code_counter = 0, line_counter = 0, word_counter = 0;
@@ -19,31 +19,31 @@ int lex(char code[]){
   while(code[code_counter]){
     switch(code[code_counter]){
       case '{':
-        tokens[token_counter++] = (AST){
+        tokens[token_counter++] = (Token){
           .token_type = OPEN_BRACE,
         };
         code_counter++;
         break;
       case '}':
-        tokens[token_counter++] = (AST){
+        tokens[token_counter++] = (Token){
           .token_type = CLOSE_BRACE,
         };
         code_counter++;
         break;
       case '(':
-        tokens[token_counter++] = (AST){
+        tokens[token_counter++] = (Token){
           .token_type = OPEN_PARENTHESIS,
         };
         code_counter++;
         break;
       case ')':
-        tokens[token_counter++] = (AST){
+        tokens[token_counter++] = (Token){
           .token_type = CLOSE_PARENTHESIS,
         };
         code_counter++;
         break;
       case ';':
-        tokens[token_counter++] = (AST){
+        tokens[token_counter++] = (Token){
           .token_type = SEMICOLON,
         };
         code_counter++;
@@ -66,12 +66,12 @@ int lex(char code[]){
           strcpy(name, word_buf);
           int keyword_type = is_keyword(word_buf);
           if(keyword_type != KEYWORD_unknown){
-            tokens[token_counter++] = (AST){
+            tokens[token_counter++] = (Token){
               .token_type = KEYWORD,
                 .name = name,
             };
           }else{
-            tokens[token_counter++] = (AST){
+            tokens[token_counter++] = (Token){
               .token_type = IDENTIFIER,
                 .name = name,
             };
@@ -83,7 +83,7 @@ int lex(char code[]){
           word_buf[word_counter] = '\0';
           char *name = (char *)malloc((word_counter+1) * sizeof(char));
           strcpy(name, word_buf);
-          tokens[token_counter++] = (AST){
+          tokens[token_counter++] = (Token){
             .token_type = LITERAL,
               .name = name,
           };
@@ -93,11 +93,7 @@ int lex(char code[]){
   return token_counter;
 }
 
-int main(int argc, char *argv[]){
-  assert(argc>=2);
-  int fd = open(argv[1], O_RDONLY);
-  read(fd, code, MAX_CODE);
-  int token_count = lex(code);
+void print_lex(Token tokens[], int token_count){
   for(int i=0;i<token_count;i++){
     if(tokens[i].token_type == OPEN_BRACE) printf("BRACE{ ");
     if(tokens[i].token_type == CLOSE_BRACE) printf("BRACE} ");
@@ -110,4 +106,12 @@ int main(int argc, char *argv[]){
     if(tokens[i].token_type == IDENTIFIER) printf("IDENTIFIER(%s) ", tokens[i].name);
     if(tokens[i].token_type == LITERAL) printf("LITERAL(%s) ", tokens[i].name);
   }
+}
+
+int main(int argc, char *argv[]){
+  assert(argc>=2);
+  int fd = open(argv[1], O_RDONLY);
+  read(fd, code, MAX_CODE);
+  int token_count = lex(code);
+  print_lex(tokens, token_count);
 }
