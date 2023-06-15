@@ -68,12 +68,13 @@ int lex(char code[]){
           if(keyword_type != KEYWORD_unknown){
             tokens[token_counter++] = (Token){
               .token_type = KEYWORD,
-                .name = name,
+              .name = name,
+              .keyword_type = keyword_type,
             };
           }else{
             tokens[token_counter++] = (Token){
               .token_type = IDENTIFIER,
-                .name = name,
+              .name = name,
             };
           }
         }else if(isdigit(code[code_counter])){
@@ -106,6 +107,69 @@ void print_lex(Token tokens[], int token_count){
     if(tokens[i].token_type == IDENTIFIER) printf("IDENTIFIER(%s) ", tokens[i].name);
     if(tokens[i].token_type == LITERAL) printf("LITERAL(%s) ", tokens[i].name);
   }
+  puts("");
+}
+
+Statement parse_statement(Token tokens[], int *token_count){
+  if(tokens[*token_count].token_type == KEYWORD && tokens[*token_count].keyword_type == KEYWORD_return){
+    (*token_count)++;
+    if(tokens[*token_count].token_type == LITERAL){
+      int return_value = atoi(tokens[(*token_count)++].name);
+      assert(tokens[(*token_count)++].token_type == SEMICOLON);
+      return (Statement){
+        .type = STAT_return,
+        .return_value = return_value,
+      };
+    }else{
+      return (Statement){
+        .type = STAT_unknown,
+      };
+    }
+  }
+  return (Statement){
+    .type = STAT_unknown,
+  };
+}
+
+Function parse_function(Token tokens[], int *token_count){
+  /* int */
+  assert(tokens[*token_count].token_type != KEYWORD || tokens[*token_count].keyword_type != KEYWORD_int);
+  (*token_count)++;
+  
+  /* main */
+  assert(tokens[*token_count].token_type == IDENTIFIER);
+  char *name = tokens[*token_count].name;
+  (*token_count)++;
+
+  /* () */
+  assert(tokens[(*token_count)++].token_type == OPEN_PARENTHESIS);
+  assert(tokens[(*token_count)++].token_type == CLOSE_PARENTHESIS);
+
+  /* { */
+  assert(tokens[(*token_count)++].token_type == OPEN_BRACE);
+
+  Statement statement = parse_statement(tokens, token_count);
+
+  assert(tokens[(*token_count)++].token_type == CLOSE_BRACE);
+
+  return (Function){
+    .name = name,
+    .statement = statement,
+  };
+}
+
+Program parse_program(Token tokens[], int token_count){
+  int parse_counter = 0;
+  Function func = parse_function(tokens, &parse_counter);
+  return (Program){
+    .func = func,
+  };
+}
+
+void print_program(Program prog){
+  printf("func: %s\n", prog.func.name);
+  printf("statement type: %d\n", prog.func.statement.type);
+  printf("return value: %d\n", prog.func.statement.return_value);
 }
 
 int main(int argc, char *argv[]){
@@ -114,4 +178,6 @@ int main(int argc, char *argv[]){
   read(fd, code, MAX_CODE);
   int token_count = lex(code);
   print_lex(tokens, token_count);
+  Program prog = parse_program(tokens, token_count);
+  print_program(prog);
 }

@@ -3,10 +3,32 @@
 typedef struct __TOKEN{
     int token_type;
     long val;
+    char *name; // including literal
     union{
-        char *name; // including literal
+        int keyword_type;
     };
 } Token;
+
+enum StatementTYPE{
+    STAT_return,
+    STAT_unknown,
+};
+
+typedef struct _Statement{
+    int type;
+    union{
+        /* for return */
+        int return_value;
+    }; 
+} Statement;
+typedef struct _Function{
+    char *name;
+    Statement statement;
+} Function;
+
+typedef struct _Program{
+    Function func;
+} Program;
 
 enum TokenType{
     OPEN_BRACE, // {
