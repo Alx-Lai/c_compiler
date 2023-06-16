@@ -16,6 +16,7 @@ char code[MAX_CODE];
 char output[MAX_CODE] = {0};
 char buf[BUF_SIZE];
 
+
 /* https://stackoverflow.com/questions/1845482/what-is-the-uintptr-t-data-type */
 Token init_token(enum TokenType type, uintptr_t data){
   return (Token){
@@ -25,14 +26,23 @@ Token init_token(enum TokenType type, uintptr_t data){
 }
 
 Token init_punctuation(char ch){
-  return (Token){
-    .token_type = PUNCTUATION,
-    .data = (uintptr_t) ch,
-  };
+  return init_token(PUNCTUATION, (uintptr_t) ch);
+}
+
+Token init_keyword(enum KeywordType type){
+  return init_token(KEYWORD, (uintptr_t) type);
+}
+
+Token init_identifier(char *str){
+  return init_token(IDENTIFIER, (uintptr_t) str);
 }
 
 bool is_punctuation(Token token, char ch){
   return token.token_type == PUNCTUATION && token.data == (uintptr_t) ch;
+}
+
+bool is_keyword(Token token, enum KeywordType type){
+  return token.token_type == KEYWORD && token.data == (uintptr_t) type;
 }
 
 
@@ -64,18 +74,11 @@ int lex(char code[]){
           buf[word_counter] = '\0';
           char *name = (char *)malloc((word_counter+1) * sizeof(char));
           strcpy(name, buf);
-          int keyword_type = is_keyword(buf);
+          int keyword_type = parse_keyword(buf);
           if(keyword_type != KEYWORD_unknown){
-            tokens[token_counter++] = (Token){
-              .token_type = KEYWORD,
-              .name = name,
-              .keyword_type = keyword_type,
-            };
+            tokens[token_counter++] = init_keyword(keyword_type);
           }else{
-            tokens[token_counter++] = (Token){
-              .token_type = IDENTIFIER,
-              .name = name,
-            };
+            tokens[token_counter++] = init_identifier(name);
           }
         }else if(isdigit(code[code_counter])){
           do{
@@ -84,10 +87,7 @@ int lex(char code[]){
           buf[word_counter] = '\0';
           char *name = (char *)malloc((word_counter+1) * sizeof(char));
           strcpy(name, buf);
-          tokens[token_counter++] = (Token){
-            .token_type = LITERAL,
-              .name = name,
-          };
+          tokens[token_counter++] = init_token(LITERAL, (uintptr_t)name);
         }
     }
   }
@@ -97,18 +97,17 @@ int lex(char code[]){
 void print_lex(Token tokens[], int token_count){
   for(int i=0;i<token_count;i++){
     if(tokens[i].token_type == PUNCTUATION) printf("PUNCTUATION%c ", (char)tokens[i].data);
-    if(tokens[i].token_type == KEYWORD) printf("KEYWORD(%s) ", tokens[i].name);
-    if(tokens[i].token_type == IDENTIFIER) printf("IDENTIFIER(%s) ", tokens[i].name);
-    if(tokens[i].token_type == LITERAL) printf("LITERAL(%s) ", tokens[i].name);
+    if(tokens[i].token_type == KEYWORD) printf("KEYWORD(%d) ", (int)tokens[i].data);
+    if(tokens[i].token_type == IDENTIFIER) printf("IDENTIFIER(%s) ", (char *)tokens[i].data);
+    if(tokens[i].token_type == LITERAL) printf("LITERAL(%s) ", (char *)tokens[i].data);
   }
   puts("");
 }
 
 Statement parse_statement(Token tokens[], int *token_count){
-  if(tokens[*token_count].token_type == KEYWORD && tokens[*token_count].keyword_type == KEYWORD_return){
-    (*token_count)++;
+  if(is_keyword(tokens[(*token_count)++], KEYWORD_return)){
     if(tokens[*token_count].token_type == LITERAL){
-      int return_value = atoi(tokens[(*token_count)++].name);
+      int return_value = atoi((char *)tokens[(*token_count)++].data);
       assert(is_punctuation(tokens[*token_count], ';'));
       (*token_count)++;
       return (Statement){
@@ -128,12 +127,11 @@ Statement parse_statement(Token tokens[], int *token_count){
 
 Function parse_function(Token tokens[], int *token_count){
   /* int */
-  assert(tokens[*token_count].token_type != KEYWORD || tokens[*token_count].keyword_type != KEYWORD_int);
-  (*token_count)++;
+  assert(is_keyword(tokens[(*token_count)++], KEYWORD_int));
   
   /* main */
   assert(tokens[*token_count].token_type == IDENTIFIER);
-  char *name = tokens[(*token_count)++].name;
+  char *name = (char *)tokens[(*token_count)++].data;
 
   /* () */
   assert(is_punctuation(tokens[(*token_count)++], '('));

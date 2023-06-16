@@ -10,10 +10,6 @@ enum TokenType{
 typedef struct Token{
     enum TokenType token_type;
     uintptr_t data;
-    char *name; // including literal
-    union{
-        int keyword_type;
-    };
 } Token;
 
 enum StatementTYPE{
@@ -44,8 +40,8 @@ enum KeywordType{
     KEYWORD_unknown,
 };
 
-enum KeywordType is_keyword(char *word){
+enum KeywordType parse_keyword(char *word){
     if(!strcmp(word, "return")) return KEYWORD_return;
-    if(!strcmp(word, "INT")) return KEYWORD_int;
+    if(!strcmp(word, "int")) return KEYWORD_int;
     return KEYWORD_unknown;
 };
