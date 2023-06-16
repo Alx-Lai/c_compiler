@@ -5,47 +5,47 @@
 #include <fcntl.h>
 #include <ctype.h>
 #include <assert.h>
+#include <stdint.h>
 #include "typing.h"
 #define MAX_CODE 0x1000
 #define BUF_SIZE 0x80
 
 Token tokens[MAX_CODE];
 char code[MAX_CODE];
+char output[MAX_CODE] = {0};
+char buf[BUF_SIZE];
+
+/* https://stackoverflow.com/questions/1845482/what-is-the-uintptr-t-data-type */
+Token init_token(enum TokenType type, uintptr_t data){
+  return (Token){
+    .token_type = type,
+    .data = data,
+  };
+}
 
 
 int lex(char code[]){
   int token_counter = 0, code_counter = 0, line_counter = 0, word_counter = 0;
-  char word_buf[BUF_SIZE];
   while(code[code_counter]){
     switch(code[code_counter]){
       case '{':
-        tokens[token_counter++] = (Token){
-          .token_type = OPEN_BRACE,
-        };
+        tokens[token_counter++] = init_token(OPEN_BRACE, (uintptr_t)'{');
         code_counter++;
         break;
       case '}':
-        tokens[token_counter++] = (Token){
-          .token_type = CLOSE_BRACE,
-        };
+        tokens[token_counter++] = init_token(CLOSE_BRACE, (uintptr_t)'}');
         code_counter++;
         break;
       case '(':
-        tokens[token_counter++] = (Token){
-          .token_type = OPEN_PARENTHESIS,
-        };
+        tokens[token_counter++] = init_token(OPEN_PARENTHESIS, (uintptr_t)'(');
         code_counter++;
         break;
       case ')':
-        tokens[token_counter++] = (Token){
-          .token_type = CLOSE_PARENTHESIS,
-        };
+        tokens[token_counter++] = init_token(CLOSE_PARENTHESIS, (uintptr_t)')');
         code_counter++;
         break;
       case ';':
-        tokens[token_counter++] = (Token){
-          .token_type = SEMICOLON,
-        };
+        tokens[token_counter++] = init_token(SEMICOLON, (uintptr_t)';');
         code_counter++;
         break;
       case '\n':
@@ -59,12 +59,12 @@ int lex(char code[]){
         word_counter = 0;
         if(isalpha(code[code_counter])){
           do{
-            word_buf[word_counter++] = code[code_counter++]; // todo: vector
+            buf[word_counter++] = code[code_counter++]; // todo: vector
           }while(isalnum(code[code_counter]));
-          word_buf[word_counter] = '\0';
+          buf[word_counter] = '\0';
           char *name = (char *)malloc((word_counter+1) * sizeof(char));
-          strcpy(name, word_buf);
-          int keyword_type = is_keyword(word_buf);
+          strcpy(name, buf);
+          int keyword_type = is_keyword(buf);
           if(keyword_type != KEYWORD_unknown){
             tokens[token_counter++] = (Token){
               .token_type = KEYWORD,
@@ -79,11 +79,11 @@ int lex(char code[]){
           }
         }else if(isdigit(code[code_counter])){
           do{
-            word_buf[word_counter++] = code[code_counter++];
+            buf[word_counter++] = code[code_counter++];
           }while(isdigit(code[code_counter]));
-          word_buf[word_counter] = '\0';
+          buf[word_counter] = '\0';
           char *name = (char *)malloc((word_counter+1) * sizeof(char));
-          strcpy(name, word_buf);
+          strcpy(name, buf);
           tokens[token_counter++] = (Token){
             .token_type = LITERAL,
               .name = name,
@@ -172,12 +172,37 @@ void print_program(Program prog){
   printf("return value: %d\n", prog.func.statement.return_value);
 }
 
+void output_statement(Statement stat){
+  if(stat.type == STAT_return){
+    sprintf(buf, "mov $%d, %%rax\n" "ret\n", stat.return_value);
+    strcat(output, buf);
+  }
+}
+
+void output_function(Function func){
+  sprintf(buf, ".globl %s\n" "%s:\n", func.name, func.name);
+  strcat(output, buf);
+  output_statement(func.statement);
+}
+
+void output_program(Program prog, char output_fn[]){
+  output[0] = '\0';
+  output_function(prog.func);
+  // printf("%s\n", output_fn);
+  // printf("%s\n", output);
+  int fd = open(output_fn, O_WRONLY | O_CREAT, 0644);
+  write(fd, output, strlen(output)+1);
+  close(fd);
+}
+
 int main(int argc, char *argv[]){
   assert(argc>=2);
   int fd = open(argv[1], O_RDONLY);
   read(fd, code, MAX_CODE);
+  close(fd);
   int token_count = lex(code);
   print_lex(tokens, token_count);
   Program prog = parse_program(tokens, token_count);
   print_program(prog);
+  output_program(prog, "a.s");
 }

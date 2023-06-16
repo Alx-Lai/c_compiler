@@ -1,35 +1,5 @@
 #include <string.h>
 
-typedef struct __TOKEN{
-    int token_type;
-    long val;
-    char *name; // including literal
-    union{
-        int keyword_type;
-    };
-} Token;
-
-enum StatementTYPE{
-    STAT_return,
-    STAT_unknown,
-};
-
-typedef struct _Statement{
-    int type;
-    union{
-        /* for return */
-        int return_value;
-    }; 
-} Statement;
-typedef struct _Function{
-    char *name;
-    Statement statement;
-} Function;
-
-typedef struct _Program{
-    Function func;
-} Program;
-
 enum TokenType{
     OPEN_BRACE, // {
     CLOSE_BRACE, // }
@@ -42,6 +12,37 @@ enum TokenType{
     IDENTIFIER, // identifier
     LITERAL, // literal
 };
+
+typedef struct Token{
+    enum TokenType token_type;
+    uintptr_t data;
+    char *name; // including literal
+    union{
+        int keyword_type;
+    };
+} Token;
+
+enum StatementTYPE{
+    STAT_return,
+    STAT_unknown,
+};
+
+typedef struct Statement{
+    int type;
+    union{
+        /* for return */
+        int return_value;
+    }; 
+} Statement;
+typedef struct Function{
+    char *name;
+    Statement statement;
+} Function;
+
+typedef struct Program{
+    Function func;
+} Program;
+
 
 enum KeywordType{
     KEYWORD_return,
