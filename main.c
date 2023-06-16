@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -23,29 +24,28 @@ Token init_token(enum TokenType type, uintptr_t data){
   };
 }
 
+Token init_punctuation(char ch){
+  return (Token){
+    .token_type = PUNCTUATION,
+    .data = (uintptr_t) ch,
+  };
+}
+
+bool is_punctuation(Token token, char ch){
+  return token.token_type == PUNCTUATION && token.data == (uintptr_t) ch;
+}
+
 
 int lex(char code[]){
   int token_counter = 0, code_counter = 0, line_counter = 0, word_counter = 0;
   while(code[code_counter]){
     switch(code[code_counter]){
       case '{':
-        tokens[token_counter++] = init_token(OPEN_BRACE, (uintptr_t)'{');
-        code_counter++;
-        break;
       case '}':
-        tokens[token_counter++] = init_token(CLOSE_BRACE, (uintptr_t)'}');
-        code_counter++;
-        break;
       case '(':
-        tokens[token_counter++] = init_token(OPEN_PARENTHESIS, (uintptr_t)'(');
-        code_counter++;
-        break;
       case ')':
-        tokens[token_counter++] = init_token(CLOSE_PARENTHESIS, (uintptr_t)')');
-        code_counter++;
-        break;
       case ';':
-        tokens[token_counter++] = init_token(SEMICOLON, (uintptr_t)';');
+        tokens[token_counter++] = init_punctuation(code[code_counter]);
         code_counter++;
         break;
       case '\n':
@@ -96,13 +96,7 @@ int lex(char code[]){
 
 void print_lex(Token tokens[], int token_count){
   for(int i=0;i<token_count;i++){
-    if(tokens[i].token_type == OPEN_BRACE) printf("BRACE{ ");
-    if(tokens[i].token_type == CLOSE_BRACE) printf("BRACE} ");
-    if(tokens[i].token_type == OPEN_BRACKET) printf("BRACKET[ ");
-    if(tokens[i].token_type == CLOSE_BRACKET) printf("BRACKET] ");
-    if(tokens[i].token_type == OPEN_PARENTHESIS) printf("PARENTHESIS( ");
-    if(tokens[i].token_type == CLOSE_PARENTHESIS) printf("PARENTHESIS) ");
-    if(tokens[i].token_type == SEMICOLON) printf("SEMICOLON; ");
+    if(tokens[i].token_type == PUNCTUATION) printf("PUNCTUATION%c ", (char)tokens[i].data);
     if(tokens[i].token_type == KEYWORD) printf("KEYWORD(%s) ", tokens[i].name);
     if(tokens[i].token_type == IDENTIFIER) printf("IDENTIFIER(%s) ", tokens[i].name);
     if(tokens[i].token_type == LITERAL) printf("LITERAL(%s) ", tokens[i].name);
@@ -115,7 +109,8 @@ Statement parse_statement(Token tokens[], int *token_count){
     (*token_count)++;
     if(tokens[*token_count].token_type == LITERAL){
       int return_value = atoi(tokens[(*token_count)++].name);
-      assert(tokens[(*token_count)++].token_type == SEMICOLON);
+      assert(is_punctuation(tokens[*token_count], ';'));
+      (*token_count)++;
       return (Statement){
         .type = STAT_return,
         .return_value = return_value,
@@ -138,19 +133,18 @@ Function parse_function(Token tokens[], int *token_count){
   
   /* main */
   assert(tokens[*token_count].token_type == IDENTIFIER);
-  char *name = tokens[*token_count].name;
-  (*token_count)++;
+  char *name = tokens[(*token_count)++].name;
 
   /* () */
-  assert(tokens[(*token_count)++].token_type == OPEN_PARENTHESIS);
-  assert(tokens[(*token_count)++].token_type == CLOSE_PARENTHESIS);
+  assert(is_punctuation(tokens[(*token_count)++], '('));
+  assert(is_punctuation(tokens[(*token_count)++], ')'));
 
   /* { */
-  assert(tokens[(*token_count)++].token_type == OPEN_BRACE);
+  assert(is_punctuation(tokens[(*token_count)++], '{'));
 
   Statement statement = parse_statement(tokens, token_count);
 
-  assert(tokens[(*token_count)++].token_type == CLOSE_BRACE);
+  assert(is_punctuation(tokens[(*token_count)++], '}'));
 
   return (Function){
     .name = name,

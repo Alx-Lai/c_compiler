@@ -1,13 +1,7 @@
 #include <string.h>
 
 enum TokenType{
-    OPEN_BRACE, // {
-    CLOSE_BRACE, // }
-    OPEN_BRACKET, // [
-    CLOSE_BRACKET, // ]
-    OPEN_PARENTHESIS, // (
-    CLOSE_PARENTHESIS, // )
-    SEMICOLON, // ;
+    PUNCTUATION, // {} [] () ;
     KEYWORD, // keyword
     IDENTIFIER, // identifier
     LITERAL, // literal
