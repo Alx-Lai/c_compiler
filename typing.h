@@ -1,16 +1,32 @@
 #include <string.h>
 
 enum TokenType{
-    PUNCTUATION, // {} [] () ;
+    PUNCTUATION, // {} [] () ; - ~ !
     KEYWORD, // keyword
     IDENTIFIER, // identifier
     LITERAL, // literal
 };
 
 typedef struct Token{
-    enum TokenType token_type;
+    enum TokenType type;
     uintptr_t data;
 } Token;
+
+enum ExpressionTYPE{
+    EXP_Unknown,
+    EXP_Unary_Arithmetic_Negation,
+    EXP_Unary_Bitwise_Complement,
+    EXP_Unary_Logical_Negation,
+    EXP_Constant,
+};
+
+typedef struct Expression{
+    int type;
+    union{
+        struct Expression* exp;
+        int val;
+    };
+} Expression;
 
 enum StatementTYPE{
     STAT_return,
@@ -21,7 +37,7 @@ typedef struct Statement{
     int type;
     union{
         /* for return */
-        int return_value;
+        Expression *return_value;
     }; 
 } Statement;
 typedef struct Function{

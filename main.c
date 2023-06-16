@@ -20,7 +20,7 @@ char buf[BUF_SIZE];
 /* https://stackoverflow.com/questions/1845482/what-is-the-uintptr-t-data-type */
 Token init_token(enum TokenType type, uintptr_t data){
   return (Token){
-    .token_type = type,
+    .type = type,
     .data = data,
   };
 }
@@ -38,11 +38,11 @@ Token init_identifier(char *str){
 }
 
 bool is_punctuation(Token token, char ch){
-  return token.token_type == PUNCTUATION && token.data == (uintptr_t) ch;
+  return token.type == PUNCTUATION && token.data == (uintptr_t) ch;
 }
 
 bool is_keyword(Token token, enum KeywordType type){
-  return token.token_type == KEYWORD && token.data == (uintptr_t) type;
+  return token.type == KEYWORD && token.data == (uintptr_t) type;
 }
 
 
@@ -55,6 +55,9 @@ int lex(char code[]){
       case '(':
       case ')':
       case ';':
+      case '-':
+      case '~':
+      case '!':
         tokens[token_counter++] = init_punctuation(code[code_counter]);
         code_counter++;
         break;
@@ -96,29 +99,53 @@ int lex(char code[]){
 
 void print_lex(Token tokens[], int token_count){
   for(int i=0;i<token_count;i++){
-    if(tokens[i].token_type == PUNCTUATION) printf("PUNCTUATION%c ", (char)tokens[i].data);
-    if(tokens[i].token_type == KEYWORD) printf("KEYWORD(%d) ", (int)tokens[i].data);
-    if(tokens[i].token_type == IDENTIFIER) printf("IDENTIFIER(%s) ", (char *)tokens[i].data);
-    if(tokens[i].token_type == LITERAL) printf("LITERAL(%s) ", (char *)tokens[i].data);
+    printf("%03d:", i);
+    if(tokens[i].type == PUNCTUATION) printf("PUNCTUATION%c ", (char)tokens[i].data);
+    if(tokens[i].type == KEYWORD) printf("KEYWORD(%d) ", (int)tokens[i].data);
+    if(tokens[i].type == IDENTIFIER) printf("IDENTIFIER(%s) ", (char *)tokens[i].data);
+    if(tokens[i].type == LITERAL) printf("LITERAL(%s) ", (char *)tokens[i].data);
+    puts("");
   }
-  puts("");
+}
+
+Expression *parse_expression(Token tokens[], int *token_count){
+  Expression *exp = (Expression *)malloc(sizeof(Expression));
+  if(is_punctuation(tokens[*token_count], '-') ||
+     is_punctuation(tokens[*token_count], '~') ||
+     is_punctuation(tokens[*token_count], '!')){
+    int type;
+    if(is_punctuation(tokens[*token_count], '-')) type = EXP_Unary_Arithmetic_Negation;
+    if(is_punctuation(tokens[*token_count], '~')) type = EXP_Unary_Bitwise_Complement;
+    if(is_punctuation(tokens[*token_count], '!')) type = EXP_Unary_Logical_Negation;
+    (*token_count)++;
+    *exp = (Expression){
+      .type = type,
+      .exp = parse_expression(tokens, token_count),
+    };
+  }else if(tokens[*token_count].type == LITERAL){
+    *exp = (Expression){
+      .type = EXP_Constant,
+      .val = atoi((char*) tokens[*token_count].data),
+    };
+    (*token_count)++;
+  }else{
+    *exp = (Expression){
+      .type = EXP_Unknown,
+    };
+  }
+  // printf("c%d -%d ~%d !%d \n", EXP_Constant, EXP_Unary_Arithmetic_Negation, EXP_Unary_Bitwise_Complement, EXP_Unary_Logical_Negation);
+  // printf("exp %d \n", exp->type);
+  return exp;
 }
 
 Statement parse_statement(Token tokens[], int *token_count){
   if(is_keyword(tokens[(*token_count)++], KEYWORD_return)){
-    if(tokens[*token_count].token_type == LITERAL){
-      int return_value = atoi((char *)tokens[(*token_count)++].data);
-      assert(is_punctuation(tokens[*token_count], ';'));
-      (*token_count)++;
-      return (Statement){
-        .type = STAT_return,
-        .return_value = return_value,
-      };
-    }else{
-      return (Statement){
-        .type = STAT_unknown,
-      };
-    }
+    Statement ret = (Statement){
+      .type = STAT_return,
+      .return_value = parse_expression(tokens, token_count),
+    };
+    assert(is_punctuation(tokens[(*token_count)++], ';'));
+    return ret;
   }
   return (Statement){
     .type = STAT_unknown,
@@ -130,7 +157,7 @@ Function parse_function(Token tokens[], int *token_count){
   assert(is_keyword(tokens[(*token_count)++], KEYWORD_int));
   
   /* main */
-  assert(tokens[*token_count].token_type == IDENTIFIER);
+  assert(tokens[*token_count].type == IDENTIFIER);
   char *name = (char *)tokens[(*token_count)++].data;
 
   /* () */
@@ -139,7 +166,7 @@ Function parse_function(Token tokens[], int *token_count){
 
   /* { */
   assert(is_punctuation(tokens[(*token_count)++], '{'));
-
+  
   Statement statement = parse_statement(tokens, token_count);
 
   assert(is_punctuation(tokens[(*token_count)++], '}'));
@@ -161,13 +188,29 @@ Program parse_program(Token tokens[], int token_count){
 void print_program(Program prog){
   printf("func: %s\n", prog.func.name);
   printf("statement type: %d\n", prog.func.statement.type);
-  printf("return value: %d\n", prog.func.statement.return_value);
+}
+
+void output_ret_expression(Expression *exp){
+  if(exp->type == EXP_Constant){
+    sprintf(buf, "mov $%d, %%rax\n", exp->val);
+  }else if(exp->type){
+    output_ret_expression(exp->exp);
+    if(exp->type == EXP_Unary_Arithmetic_Negation)
+      sprintf(buf, "neg %%rax\n");
+    else if(exp->type == EXP_Unary_Bitwise_Complement)
+      sprintf(buf, "not %%rax\n");
+    else if(exp->type == EXP_Unary_Logical_Negation)
+      sprintf(buf, "cmp $0, %%rax\n" "mov $0, %%rax\n" "sete %%al\n");
+  }else{
+    assert(false);
+  }
+  strcat(output, buf);
 }
 
 void output_statement(Statement stat){
   if(stat.type == STAT_return){
-    sprintf(buf, "mov $%d, %%rax\n" "ret\n", stat.return_value);
-    strcat(output, buf);
+    output_ret_expression(stat.return_value);
+    strcat(output, "ret\n");
   }
 }
 
@@ -180,10 +223,8 @@ void output_function(Function func){
 void output_program(Program prog, char output_fn[]){
   output[0] = '\0';
   output_function(prog.func);
-  // printf("%s\n", output_fn);
-  // printf("%s\n", output);
-  int fd = open(output_fn, O_WRONLY | O_CREAT, 0644);
-  write(fd, output, strlen(output)+1);
+  int fd = open(output_fn, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+  write(fd, output, strlen(output));
   close(fd);
 }
 
@@ -195,6 +236,5 @@ int main(int argc, char *argv[]){
   int token_count = lex(code);
   print_lex(tokens, token_count);
   Program prog = parse_program(tokens, token_count);
-  print_program(prog);
   output_program(prog, "a.s");
 }
