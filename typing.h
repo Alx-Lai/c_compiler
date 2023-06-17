@@ -1,7 +1,8 @@
 #include <string.h>
 
+/* lexer */
 enum TokenType{
-    PUNCTUATION, // {} [] () ; - ~ !
+    PUNCTUATION, // {} [] () ; ~ ! + - * /
     KEYWORD, // keyword
     IDENTIFIER, // identifier
     LITERAL, // literal
@@ -9,46 +10,9 @@ enum TokenType{
 
 typedef struct Token{
     enum TokenType type;
+    /* https://stackoverflow.com/questions/1845482/what-is-the-uintptr-t-data-type */
     uintptr_t data;
 } Token;
-
-enum ExpressionTYPE{
-    EXP_Unknown,
-    EXP_Unary_Arithmetic_Negation,
-    EXP_Unary_Bitwise_Complement,
-    EXP_Unary_Logical_Negation,
-    EXP_Constant,
-};
-
-typedef struct Expression{
-    int type;
-    union{
-        struct Expression* exp;
-        int val;
-    };
-} Expression;
-
-enum StatementTYPE{
-    STAT_return,
-    STAT_unknown,
-};
-
-typedef struct Statement{
-    int type;
-    union{
-        /* for return */
-        Expression *return_value;
-    }; 
-} Statement;
-typedef struct Function{
-    char *name;
-    Statement statement;
-} Function;
-
-typedef struct Program{
-    Function func;
-} Program;
-
 
 enum KeywordType{
     KEYWORD_return,
@@ -61,3 +25,43 @@ enum KeywordType parse_keyword(char *word){
     if(!strcmp(word, "int")) return KEYWORD_int;
     return KEYWORD_unknown;
 };
+
+/* parser */
+
+enum ASTType{
+    AST_literal,
+    AST_function,
+    AST_return,
+    AST_unary_op,
+    AST_binary_op,
+};
+
+typedef struct AST{
+    int ast_type;
+
+    int type; // including function return type
+    union{
+        /* literal integer */
+        long val;
+
+        /* return */
+        struct AST *return_value;
+
+        /* declare function */
+        struct{
+            char *func_name;
+            struct AST *body;
+        };
+
+        /* Unary operator */
+        struct{
+            struct AST *exp;
+        };
+
+        /* Binary operator */
+        struct{
+            struct AST *left, *right;
+        };
+
+    };
+} AST;

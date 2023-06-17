@@ -17,7 +17,6 @@ char output[MAX_CODE] = {0};
 char buf[BUF_SIZE];
 
 
-/* https://stackoverflow.com/questions/1845482/what-is-the-uintptr-t-data-type */
 Token init_token(enum TokenType type, uintptr_t data){
   return (Token){
     .type = type,
@@ -45,6 +44,10 @@ bool is_keyword(Token token, enum KeywordType type){
   return token.type == KEYWORD && token.data == (uintptr_t) type;
 }
 
+void fail(){
+    assert(0);
+}
+
 
 int lex(char code[]){
   int token_counter = 0, code_counter = 0, line_counter = 0, word_counter = 0;
@@ -55,7 +58,10 @@ int lex(char code[]){
       case '(':
       case ')':
       case ';':
+      case '+':
       case '-':
+      case '*':
+      case '/':
       case '~':
       case '!':
         tokens[token_counter++] = init_punctuation(code[code_counter]);
@@ -108,122 +114,155 @@ void print_lex(Token tokens[], int token_count){
   }
 }
 
-Expression *parse_expression(Token tokens[], int *token_count){
-  Expression *exp = (Expression *)malloc(sizeof(Expression));
-  if(is_punctuation(tokens[*token_count], '-') ||
-     is_punctuation(tokens[*token_count], '~') ||
-     is_punctuation(tokens[*token_count], '!')){
-    int type;
-    if(is_punctuation(tokens[*token_count], '-')) type = EXP_Unary_Arithmetic_Negation;
-    if(is_punctuation(tokens[*token_count], '~')) type = EXP_Unary_Bitwise_Complement;
-    if(is_punctuation(tokens[*token_count], '!')) type = EXP_Unary_Logical_Negation;
-    (*token_count)++;
-    *exp = (Expression){
-      .type = type,
-      .exp = parse_expression(tokens, token_count),
-    };
-  }else if(tokens[*token_count].type == LITERAL){
-    *exp = (Expression){
-      .type = EXP_Constant,
-      .val = atoi((char*) tokens[*token_count].data),
-    };
-    (*token_count)++;
-  }else{
-    *exp = (Expression){
-      .type = EXP_Unknown,
-    };
-  }
-  // printf("c%d -%d ~%d !%d \n", EXP_Constant, EXP_Unary_Arithmetic_Negation, EXP_Unary_Bitwise_Complement, EXP_Unary_Logical_Negation);
-  // printf("exp %d \n", exp->type);
-  return exp;
+AST *parse_expression(Token tokens[], int *counter){
+    AST *ret = (AST *)malloc(sizeof(AST));
+    /* unary */
+    if(is_punctuation(tokens[(*counter)], '-') ||
+       is_punctuation(tokens[(*counter)], '~') ||
+       is_punctuation(tokens[(*counter)], '!')){
+        int type = (char) tokens[(*counter)].data;
+        (*counter)++;
+        *ret = (AST){
+            .ast_type = AST_unary_op,
+            .type = type,
+            .exp = parse_expression(tokens, counter),
+        };
+        return ret;
+    }else if(tokens[(*counter)].type == LITERAL ||
+             is_punctuation(tokens[(*counter)], '(')){
+        AST *left;
+
+        if(tokens[(*counter)].type == LITERAL){
+            left = (AST *)malloc(sizeof(AST));
+            *left = (AST){
+                .ast_type = AST_literal,
+                .type = KEYWORD_int,
+                .val = atoi((char *)tokens[(*counter)].data),
+            };
+            (*counter)++;
+        }else if(is_punctuation(tokens[(*counter)], '(')){
+            (*counter)++;
+            left = parse_expression(tokens, counter);
+            assert(is_punctuation(tokens[(*counter)++], ')'));
+        }
+
+        /* binary op */
+        if(is_punctuation(tokens[(*counter)], '+') ||
+           is_punctuation(tokens[(*counter)], '-') ||
+           is_punctuation(tokens[(*counter)], '*') ||
+           is_punctuation(tokens[(*counter)], '/')){
+            char type = (char)tokens[(*counter)].data;
+            (*counter)++;
+            *ret = (AST){
+                .ast_type = AST_binary_op,
+                .type = type,
+                .left = left,
+                .right = parse_expression(tokens, counter),
+            };
+            return ret;
+        }
+
+        return left;
+    }
+    fail();
+    return NULL;
 }
 
-Statement parse_statement(Token tokens[], int *token_count){
-  if(is_keyword(tokens[(*token_count)++], KEYWORD_return)){
-    Statement ret = (Statement){
-      .type = STAT_return,
-      .return_value = parse_expression(tokens, token_count),
+AST *parse_statement(Token tokens[], int *counter){
+    AST *ret = (AST *)malloc(sizeof(AST)); // TODO: prevent memory leak
+    if(is_keyword(tokens[(*counter)], KEYWORD_return)){
+        (*counter)++;
+        *ret = (AST){
+            .ast_type = AST_return,
+            .return_value = parse_expression(tokens, counter),
+        };
+        assert(is_punctuation(tokens[(*counter)++], ';'));
+        return ret;
+    }
+    fail();
+    return NULL;
+}
+
+AST *parse_function(Token tokens[], int *counter){
+    AST *ret = (AST *)malloc(sizeof(AST));
+    /* int */
+    assert(is_keyword(tokens[(*counter)], KEYWORD_int));
+    int return_type = (enum KeywordType)tokens[(*counter)++].data;
+
+    /* main */
+    assert(tokens[*counter].type == IDENTIFIER);
+    char *name = (char *)tokens[(*counter)++].data;
+
+    /* () */
+    assert(is_punctuation(tokens[(*counter)++], '('));
+    assert(is_punctuation(tokens[(*counter)++], ')'));
+
+    /* { */
+    assert(is_punctuation(tokens[(*counter)++], '{'));
+
+    AST *body = parse_statement(tokens, counter);
+
+    /* } */
+    assert(is_punctuation(tokens[(*counter)++], '}'));
+
+    *ret = (AST){
+        .ast_type = AST_function,
+        .type = return_type,
+        .func_name = name,
+        .body = body,
     };
-    assert(is_punctuation(tokens[(*token_count)++], ';'));
     return ret;
-  }
-  return (Statement){
-    .type = STAT_unknown,
-  };
 }
 
-Function parse_function(Token tokens[], int *token_count){
-  /* int */
-  assert(is_keyword(tokens[(*token_count)++], KEYWORD_int));
-  
-  /* main */
-  assert(tokens[*token_count].type == IDENTIFIER);
-  char *name = (char *)tokens[(*token_count)++].data;
-
-  /* () */
-  assert(is_punctuation(tokens[(*token_count)++], '('));
-  assert(is_punctuation(tokens[(*token_count)++], ')'));
-
-  /* { */
-  assert(is_punctuation(tokens[(*token_count)++], '{'));
-  
-  Statement statement = parse_statement(tokens, token_count);
-
-  assert(is_punctuation(tokens[(*token_count)++], '}'));
-
-  return (Function){
-    .name = name,
-    .statement = statement,
-  };
+AST *parse_ast(Token tokens[], int token_count){ // todo: parse (1) / 2
+    int counter = 0;
+    AST *ret = parse_function(tokens, &counter);
+    assert(counter == token_count);
+    return ret;
 }
 
-Program parse_program(Token tokens[], int token_count){
-  int parse_counter = 0;
-  Function func = parse_function(tokens, &parse_counter);
-  return (Program){
-    .func = func,
-  };
-}
-
-void print_program(Program prog){
-  printf("func: %s\n", prog.func.name);
-  printf("statement type: %d\n", prog.func.statement.type);
-}
-
-void output_ret_expression(Expression *exp){
-  if(exp->type == EXP_Constant){
-    sprintf(buf, "mov $%d, %%rax\n", exp->val);
-  }else if(exp->type){
-    output_ret_expression(exp->exp);
-    if(exp->type == EXP_Unary_Arithmetic_Negation)
-      sprintf(buf, "neg %%rax\n");
-    else if(exp->type == EXP_Unary_Bitwise_Complement)
-      sprintf(buf, "not %%rax\n");
-    else if(exp->type == EXP_Unary_Logical_Negation)
-      sprintf(buf, "cmp $0, %%rax\n" "mov $0, %%rax\n" "sete %%al\n");
-  }else{
-    assert(false);
-  }
-  strcat(output, buf);
-}
-
-void output_statement(Statement stat){
-  if(stat.type == STAT_return){
-    output_ret_expression(stat.return_value);
+void output_ast(AST *ast){
+  if(ast->ast_type == AST_function){
+    sprintf(buf, ".globl %s\n" "%s:\n", ast->func_name, ast->func_name);
+    strcat(output, buf);
+    output_ast(ast->body);
+  }else if(ast->ast_type == AST_return){
+    output_ast(ast->return_value);
     strcat(output, "ret\n");
+  }else if(ast->ast_type == AST_literal){
+    sprintf(buf, "mov $%ld, %%rax\n", ast->val);
+    strcat(output, buf);
+  }else if(ast->ast_type == AST_unary_op){
+    output_ast(ast->exp);
+    if(ast->type == '-'){
+      strcat(output, "neg %rax\n");
+    }else if(ast->type == '!'){
+      strcat(output, "not %rax\n");
+    }else if(ast->type == '~'){
+      strcat(output, "cmp $0, %rax\n" "mov $0, %rax\n" "sete %al\n");
+    }
+  }else if(ast->ast_type == AST_binary_op){
+    output_ast(ast->left);
+    strcat(output, "push %rax\n");
+    output_ast(ast->right);
+    strcat(output, "pop %rcx\n");
+    if(ast->type == '+'){
+      strcat(output, "add %rcx, %rax\n");
+    }else if(ast->type == '-'){
+      strcat(output, "sub %rcx, %rax\n");
+    }else if(ast->type == '*'){
+      strcat(output, "mul %rcx, %rax\n");
+    }else if(ast->type == '/'){
+      strcat(output, "div %rcx, %rax\n");
+    }
+  }else{
+    fail();
   }
 }
 
-void output_function(Function func){
-  sprintf(buf, ".globl %s\n" "%s:\n", func.name, func.name);
-  strcat(output, buf);
-  output_statement(func.statement);
-}
-
-void output_program(Program prog, char output_fn[]){
-  output[0] = '\0';
-  output_function(prog.func);
-  int fd = open(output_fn, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+void output_program(AST *ast){
+  output_ast(ast);
+  int fd = open("a.s", O_WRONLY | O_CREAT | O_TRUNC, 0644);
   write(fd, output, strlen(output));
   close(fd);
 }
@@ -235,6 +274,6 @@ int main(int argc, char *argv[]){
   close(fd);
   int token_count = lex(code);
   print_lex(tokens, token_count);
-  Program prog = parse_program(tokens, token_count);
-  output_program(prog, "a.s");
+  AST *ast = parse_ast(tokens, token_count);
+  output_program(ast);
 }
