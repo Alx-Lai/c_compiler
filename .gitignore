@@ -1,3 +1,4 @@
 write_a_c_compiler/
 main
 .vscode/
+.gdb_history

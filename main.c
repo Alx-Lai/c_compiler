@@ -243,17 +243,30 @@ void output_ast(AST *ast){
     }
   }else if(ast->ast_type == AST_binary_op){
     output_ast(ast->left);
-    strcat(output, "push %rax\n");
+    strcat(output, "push %rax\n"); // cannot push 32 bit reg in x64 machine
     output_ast(ast->right);
-    strcat(output, "pop %rcx\n");
     if(ast->type == '+'){
+      strcat(output, "pop %rcx\n");
       strcat(output, "add %rcx, %rax\n");
     }else if(ast->type == '-'){
+      /* sub rcx, rax ; rax = rax - rcx */
+      // now 1 - 2 - 3 will be parsed as 1 - (2 - 3)
+      strcat(output, "push %rax\n");
+      strcat(output, "pop %rcx\n"); // subtrahend
+      strcat(output, "pop %rax\n"); // minuend
       strcat(output, "sub %rcx, %rax\n");
     }else if(ast->type == '*'){
-      strcat(output, "mul %rcx, %rax\n");
+      /* imul rbx ; rdx:rax = rbx*rax */
+      strcat(output, "pop %rbx\n");
+      strcat(output, "imul %rbx\n"); // don't care about overflow now
     }else if(ast->type == '/'){
-      strcat(output, "div %rcx, %rax\n");
+      /* idiv rbx ; rax = rdx:rax / rbx, rdx = rdx:rax % rax  */
+      // now 6 / 3 / 2 will be parsed as 6 / (3 / 2)
+      strcat(output, "push %rax\n"); // denominator
+      strcat(output, "xor %rdx, %rdx\n"); // clean rdx
+      strcat(output, "pop %rbx\n");
+      strcat(output, "pop %rax\n"); // don't care about overflow now
+      strcat(output, "idiv %rbx\n");
     }
   }else{
     fail();
