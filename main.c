@@ -61,8 +61,14 @@ bool is_binary_op(Token token) {
                                  '<',
                                  PUNCTUATION_less_equal,
                                  '>',
-                                 PUNCTUATION_greater_equal};
-  int len = 12;
+                                 PUNCTUATION_greater_equal,
+                                 '%',
+                                 '&',
+                                 '|',
+                                 '^',
+                                 PUNCTUATION_bitwise_shift_left,
+                                 PUNCTUATION_bitwise_shift_right};
+  int len = 18;
   for (int i = 0; i < len; i++)
     if (type == binary_op_set[i])
       return true;
@@ -90,10 +96,14 @@ int get_precedence(Token token) {
   switch (type) {
   case '*':
   case '/':
+  case '%':
     return 3;
   case '+':
   case '-':
     return 4;
+  case PUNCTUATION_bitwise_shift_left:
+  case PUNCTUATION_bitwise_shift_right:
+    return 5;
   case '<':
   case '>':
   case PUNCTUATION_less_equal:
@@ -102,6 +112,12 @@ int get_precedence(Token token) {
   case PUNCTUATION_equal:
   case PUNCTUATION_not_equal:
     return 7;
+  case '&':
+    return 8;
+  case '^':
+    return 9;
+  case '|':
+    return 10;
   case PUNCTUATION_logical_and:
     return 11;
   case PUNCTUATION_logical_or:
@@ -124,20 +140,36 @@ int lex(char code[]) {
     case '-':
     case '*':
     case '/':
+    case '%':
     case '~':
+    case '^':
       tokens[token_counter++] = init_punctuation(code[code_counter]);
       code_counter++;
       break;
     case '!':
+      if (code[code_counter + 1] == '=') {
+        tokens[token_counter++] = init_punctuation(PUNCTUATION_not_equal);
+        code_counter++;
+      } else {
+        tokens[token_counter++] = init_punctuation(code[code_counter]);
+      }
+      code_counter++;
+      break;
     case '>':
     case '<':
       if (code[code_counter + 1] == '=') {
-        if (code[code_counter] == '!')
-          tokens[token_counter++] = init_punctuation(PUNCTUATION_not_equal);
-        else if (code[code_counter] == '>')
+        if (code[code_counter] == '>')
           tokens[token_counter++] = init_punctuation(PUNCTUATION_greater_equal);
         else if (code[code_counter] == '<')
           tokens[token_counter++] = init_punctuation(PUNCTUATION_less_equal);
+        code_counter++;
+      } else if (code[code_counter] == code[code_counter + 1]) {
+        if (code[code_counter] == '>')
+          tokens[token_counter++] =
+              init_punctuation(PUNCTUATION_bitwise_shift_right);
+        else if (code[code_counter] == '<')
+          tokens[token_counter++] =
+              init_punctuation(PUNCTUATION_bitwise_shift_left);
         code_counter++;
       } else {
         tokens[token_counter++] = init_punctuation(code[code_counter]);
@@ -159,10 +191,11 @@ int lex(char code[]) {
           tokens[token_counter++] = init_punctuation(PUNCTUATION_logical_and);
         else if (code[code_counter] == '|')
           tokens[token_counter++] = init_punctuation(PUNCTUATION_logical_or);
-        code_counter += 2;
+        code_counter++;
       } else {
-        fail(__LINE__); // bitwise and/or is not implemented
+        tokens[token_counter++] = init_punctuation(code[code_counter]);
       }
+      code_counter++;
       break;
     case '\n':
       line_counter++;
@@ -534,6 +567,59 @@ void output_ast(AST *ast) {
                      "cmp %rax, %rcx\n"
                      "mov $0, %rax\n"
                      "setge %al\n");
+      break;
+    case '%':
+      /* idiv rbx ; rax = rdx:rax / rbx, rdx = rdx:rax % rax  */
+      output_ast(ast->left); // TODO: refactor
+      strcat(output, "push %rax\n");
+      output_ast(ast->right);
+      strcat(output, "push %rax\n"      // denominator
+                     "xor %rdx, %rdx\n" // clean rdx
+                     "pop %rbx\n"
+                     "pop %rax\n" // don't care about overflow now
+                     "idiv %rbx\n"
+                     "mov %rdx, %rax");
+      break;
+    case '&':
+      output_ast(ast->left);
+      strcat(output, "push %rax\n");
+      output_ast(ast->right);
+      strcat(output, "pop %rcx\n"
+                     "and %rcx, %rax\n");
+      break;
+    case '|':
+      output_ast(ast->left);
+      strcat(output, "push %rax\n");
+      output_ast(ast->right);
+      strcat(output, "pop %rcx\n"
+                     "or %rcx, %rax\n");
+      break;
+    case '^':
+      output_ast(ast->left);
+      strcat(output, "push %rax\n");
+      output_ast(ast->right);
+      strcat(output, "pop %rcx\n"
+                     "xor %rcx, %rax\n");
+      break;
+    case PUNCTUATION_bitwise_shift_left:
+      output_ast(ast->left); // TODO: refactor
+      strcat(output, "push %rax\n");
+      output_ast(ast->right);
+      strcat(output, "xor %rcx, %rcx\n"
+                     "mov %al, %cl\n"
+                     "pop %rax\n"       // don't care about overflow now
+                     "shl %cl, %rax\n");
+      break;
+    case PUNCTUATION_bitwise_shift_right:
+      output_ast(ast->left); // TODO: refactor
+      strcat(output, "push %rax\n");
+      output_ast(ast->right);
+      strcat(output, "mov %rax, %rcx\n"
+                     "pop %rax\n" // don't care about overflow now
+                     "shr %cl, %rax\n");
+      break;
+    default:
+      fail(__LINE__);
       break;
     }
   } else {

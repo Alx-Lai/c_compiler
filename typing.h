@@ -17,6 +17,8 @@ enum {
   PUNCTUATION_not_equal = 'd',     // !=
   PUNCTUATION_less_equal = 'e',    // <=
   PUNCTUATION_greater_equal = 'f', // >=
+  PUNCTUATION_bitwise_shift_left = 'g', // <<
+  PUNCTUATION_bitwise_shift_right = 'h', // >>
 };
 
 typedef struct Token {
