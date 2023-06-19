@@ -222,10 +222,11 @@ AST *parse_expression(Token tokens[], int *counter) {
       is_punctuation(tokens[(*counter)], '-') ||
       is_punctuation(tokens[(*counter)], '*') ||
       is_punctuation(tokens[(*counter)], '/')) {
+    int pred_front = get_precedence(tokens[(*counter)]);
     char type = (char)tokens[(*counter)].data;
     (*counter)++;
     right = parse_unary_expression(tokens, counter);
-    // peek next op precedence // TODO: add precedence function
+    // peek next op precedence
     /**
      * a - b * c
      *    -
@@ -243,43 +244,44 @@ AST *parse_expression(Token tokens[], int *counter) {
      *
      */
     AST *ret = (AST *)malloc(sizeof(AST));
-    if ((is_punctuation(tokens[(*counter)], '*') ||
-         is_punctuation(tokens[(*counter)], '/')) &&
-        (type == '+' || type == '-')) {
-      char type2 = (char)tokens[(*counter)].data;
-      (*counter)++;
-      AST *new_right = (AST *)malloc(sizeof(AST));
-      *new_right = (AST){
-          .ast_type = AST_binary_op,
-          .type = type2,
-          .left = right,
-          .right = parse_expression(tokens, counter),
-      };
-      *ret = (AST){
-          .ast_type = AST_binary_op,
-          .type = type,
-          .left = left,
-          .right = new_right,
-      };
-    } else if (is_punctuation(tokens[(*counter)], '+') ||
-               is_punctuation(tokens[(*counter)], '-') ||
-               is_punctuation(tokens[(*counter)], '*') ||
-               is_punctuation(tokens[(*counter)], '/')) {
-      char type2 = (char)tokens[(*counter)].data;
-      (*counter)++;
-      AST *sub_root = (AST *)malloc(sizeof(AST));
-      *sub_root = (AST){
-          .ast_type = AST_binary_op,
-          .type = type,
-          .left = left,
-          .right = right,
-      };
-      *ret = (AST){
-          .ast_type = AST_binary_op,
-          .type = type2,
-          .left = sub_root,
-          .right = parse_expression(tokens, counter),
-      };
+    if (is_punctuation(tokens[(*counter)], '+') ||
+        is_punctuation(tokens[(*counter)], '-') ||
+        is_punctuation(tokens[(*counter)], '*') ||
+        is_punctuation(tokens[(*counter)], '/')) {
+      int pred_back = get_precedence(tokens[(*counter)]);
+      if (pred_front > pred_back) {
+        char type2 = (char)tokens[(*counter)].data;
+        (*counter)++;
+        AST *new_right = (AST *)malloc(sizeof(AST));
+        *new_right = (AST){
+            .ast_type = AST_binary_op,
+            .type = type2,
+            .left = right,
+            .right = parse_expression(tokens, counter),
+        };
+        *ret = (AST){
+            .ast_type = AST_binary_op,
+            .type = type,
+            .left = left,
+            .right = new_right,
+        };
+      } else {
+        char type2 = (char)tokens[(*counter)].data;
+        (*counter)++;
+        AST *sub_root = (AST *)malloc(sizeof(AST));
+        *sub_root = (AST){
+            .ast_type = AST_binary_op,
+            .type = type,
+            .left = left,
+            .right = right,
+        };
+        *ret = (AST){
+            .ast_type = AST_binary_op,
+            .type = type2,
+            .left = sub_root,
+            .right = parse_expression(tokens, counter),
+        };
+      }
     } else {
       *ret = (AST){
           .ast_type = AST_binary_op,
