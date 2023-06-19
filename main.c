@@ -59,9 +59,9 @@ enum KeywordType parse_keyword(char *word) {
 int get_precedence(Token token) {
   if (token.type != PUNCTUATION)
     return 0;
-  char type = (char)token.data
-              /* not deal with unary op */
-              switch (expression) {
+  char type = (char)token.data;
+  /* not deal with unary op */
+  switch (type) {
   case '*':
   case '/':
     return 3;
