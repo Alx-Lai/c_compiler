@@ -9,7 +9,7 @@
 #include <string.h>
 #include <unistd.h>
 #define MAX_CODE 0x1000
-#define BUF_SIZE 0x80
+#define BUF_SIZE 0x200
 
 Token tokens[MAX_CODE];
 char code[MAX_CODE];
@@ -43,6 +43,32 @@ bool is_keyword(Token token, enum KeywordType type) {
   return token.type == KEYWORD && token.data == (uintptr_t)type;
 }
 
+int get_label_counter() {
+  static int counter = 0;
+  return counter++;
+}
+
+bool is_binary_op(Token token) {
+  char type = (char)token.data;
+  static char binary_op_set[] = {'+',
+                                 '-',
+                                 '*',
+                                 '/',
+                                 PUNCTUATION_logical_and,
+                                 PUNCTUATION_logical_or,
+                                 PUNCTUATION_equal,
+                                 PUNCTUATION_not_equal,
+                                 '<',
+                                 PUNCTUATION_less_equal,
+                                 '>',
+                                 PUNCTUATION_greater_equal};
+  int len = 12;
+  for (int i = 0; i < len; i++)
+    if (type == binary_op_set[i])
+      return true;
+  return false;
+}
+
 void fail(int line_number) {
   fprintf(stderr, "fail at line %d\n", line_number);
   assert(0);
@@ -68,6 +94,14 @@ int get_precedence(Token token) {
   case '+':
   case '-':
     return 4;
+  case '<':
+  case '>':
+  case PUNCTUATION_less_equal:
+  case PUNCTUATION_greater_equal:
+    return 6;
+  case PUNCTUATION_equal:
+  case PUNCTUATION_not_equal:
+    return 7;
   case PUNCTUATION_logical_and:
     return 11;
   case PUNCTUATION_logical_or:
@@ -122,9 +156,9 @@ int lex(char code[]) {
     case '|':
       if (code[code_counter + 1] == code[code_counter]) {
         if (code[code_counter] == '&')
-          tokens[token_counter++] = init_punctuation(PUNCTUATION_equal);
+          tokens[token_counter++] = init_punctuation(PUNCTUATION_logical_and);
         else if (code[code_counter] == '|')
-          tokens[token_counter++] = init_punctuation(PUNCTUATION_equal);
+          tokens[token_counter++] = init_punctuation(PUNCTUATION_logical_or);
         code_counter += 2;
       } else {
         fail(__LINE__); // bitwise and/or is not implemented
@@ -218,10 +252,7 @@ AST *parse_expression(Token tokens[], int *counter) {
   AST *left = parse_unary_expression(tokens, counter), *right;
   /* binary op */
   /* binary parse from left to right  */
-  if (is_punctuation(tokens[(*counter)], '+') ||
-      is_punctuation(tokens[(*counter)], '-') ||
-      is_punctuation(tokens[(*counter)], '*') ||
-      is_punctuation(tokens[(*counter)], '/')) {
+  if (is_binary_op(tokens[(*counter)])) {
     int pred_front = get_precedence(tokens[(*counter)]);
     char type = (char)tokens[(*counter)].data;
     (*counter)++;
@@ -244,10 +275,7 @@ AST *parse_expression(Token tokens[], int *counter) {
      *
      */
     AST *ret = (AST *)malloc(sizeof(AST));
-    if (is_punctuation(tokens[(*counter)], '+') ||
-        is_punctuation(tokens[(*counter)], '-') ||
-        is_punctuation(tokens[(*counter)], '*') ||
-        is_punctuation(tokens[(*counter)], '/')) {
+    if (is_binary_op(tokens[(*counter)])) {
       int pred_back = get_precedence(tokens[(*counter)]);
       if (pred_front > pred_back) {
         char type2 = (char)tokens[(*counter)].data;
@@ -342,7 +370,7 @@ AST *parse_function(Token tokens[], int *counter) {
   return ret;
 }
 
-AST *parse_ast(Token tokens[], int token_count) { // todo: parse (1) / 2
+AST *parse_ast(Token tokens[], int token_count) {
   int counter = 0;
   AST *ret = parse_function(tokens, &counter);
   assert(counter == token_count);
@@ -375,31 +403,138 @@ void output_ast(AST *ast) {
                      "sete %al\n");
     }
   } else if (ast->ast_type == AST_binary_op) {
-    output_ast(ast->left);
-    strcat(output, "push %rax\n"); // cannot push 32 bit reg in x64 machine
-    output_ast(ast->right);
-    if (ast->type == '+') {
-      strcat(output, "pop %rcx\n");
-      strcat(output, "add %rcx, %rax\n");
-    } else if (ast->type == '-') {
-      /* sub rcx, rax ; rax = rax - rcx */
-      // now 1 - 2 - 3 will be parsed as 1 - (2 - 3)
+    // cannot push 32 bit reg in x64 machine
+    int counter;
+    switch (ast->type) {
+    case '+':
+      output_ast(ast->left);
       strcat(output, "push %rax\n");
-      strcat(output, "pop %rcx\n"); // subtrahend
-      strcat(output, "pop %rax\n"); // minuend
-      strcat(output, "sub %rcx, %rax\n");
-    } else if (ast->type == '*') {
+      output_ast(ast->right);
+      strcat(output, "pop %rcx\n"
+                     "add %rcx, %rax\n");
+      break;
+    case '-':
+      /* sub rcx, rax ; rax = rax - rcx */
+      output_ast(ast->left);
+      strcat(output, "push %rax\n");
+      output_ast(ast->right);
+      strcat(output, "push %rax\n"
+                     "pop %rcx\n"
+                     "pop %rax\n"
+                     "sub %rcx, %rax\n");
+      break;
+    case '*':
       /* imul rbx ; rdx:rax = rbx*rax */
-      strcat(output, "pop %rbx\n");
-      strcat(output, "imul %rbx\n"); // don't care about overflow now
-    } else if (ast->type == '/') {
+      output_ast(ast->left);
+      strcat(output, "push %rax\n");
+      output_ast(ast->right);
+      strcat(output, "pop %rbx\n"
+                     "imul %rbx\n"); // don't care about overflow now
+      break;
+    case '/':
       /* idiv rbx ; rax = rdx:rax / rbx, rdx = rdx:rax % rax  */
-      // now 6 / 3 / 2 will be parsed as 6 / (3 / 2)
-      strcat(output, "push %rax\n");      // denominator
-      strcat(output, "xor %rdx, %rdx\n"); // clean rdx
-      strcat(output, "pop %rbx\n");
-      strcat(output, "pop %rax\n"); // don't care about overflow now
-      strcat(output, "idiv %rbx\n");
+      output_ast(ast->left); // TODO: refactor
+      strcat(output, "push %rax\n");
+      output_ast(ast->right);
+      strcat(output, "push %rax\n"      // denominator
+                     "xor %rdx, %rdx\n" // clean rdx
+                     "pop %rbx\n"
+                     "pop %rax\n" // don't care about overflow now
+                     "idiv %rbx\n");
+      break;
+    case PUNCTUATION_logical_and:
+      counter = get_label_counter();
+      output_ast(ast->left);
+      sprintf(buf,
+              "cmp $0, %%rax\n"
+              "jne _clause%d\n"
+              "jmp _end%d\n"
+              "_clause%d:\n",
+              counter, counter, counter);
+      strcat(output, buf);
+      output_ast(ast->right);
+      sprintf(buf,
+              "cmp $0, %%rax\n"
+              "mov $0, %%rax\n"
+              "setne %%al\n"
+              "_end%d:\n",
+              counter);
+      strcat(output, buf);
+      break;
+    case PUNCTUATION_logical_or:
+      counter = get_label_counter();
+      output_ast(ast->left);
+      sprintf(buf,
+              "cmp $0, %%rax\n"
+              "je _clause%d\n"
+              "mov $1, %%rax\n"
+              "jmp _end%d\n"
+              "_clause%d:\n",
+              counter, counter, counter);
+      strcat(output, buf);
+      output_ast(ast->right);
+      sprintf(buf,
+              "cmp $0, %%rax\n"
+              "mov $0, %%rax\n"
+              "setne %%al\n"
+              "_end%d:\n",
+              counter);
+      strcat(output, buf);
+      break;
+    case PUNCTUATION_equal:
+      output_ast(ast->left);
+      strcat(output, "push %rax\n");
+      output_ast(ast->right);
+      strcat(output, "pop %rcx\n"
+                     "cmp %rax, %rcx\n"
+                     "mov $0, %rax\n" // use xor clean flags
+                     "sete %al\n");
+      break;
+    case PUNCTUATION_not_equal:
+      output_ast(ast->left);
+      strcat(output, "push %rax\n");
+      output_ast(ast->right);
+      strcat(output, "pop %rcx\n"
+                     "cmp %rax, %rcx\n"
+                     "mov $0, %rax\n"
+                     "setne %al\n");
+      break;
+    case '<':
+      output_ast(ast->left);
+      strcat(output, "push %rax\n");
+      output_ast(ast->right);
+      strcat(output, "pop %rcx\n"
+                     "cmp %rax, %rcx\n"
+                     "mov $0, %rax\n"
+                     "setl %al\n");
+      break;
+    case '>':
+      output_ast(ast->left);
+      strcat(output, "push %rax\n");
+      output_ast(ast->right);
+      strcat(output, "pop %rcx\n"
+                     "cmp %rcx, %rax\n"
+                     "mov $0, %rax\n"
+                     "setl %al\n");
+      break;
+    case PUNCTUATION_less_equal:
+      output_ast(ast->left);
+      strcat(output, "push %rax\n");
+      output_ast(ast->right);
+      strcat(output, "pop %rcx\n"
+                     "cmp %rcx, %rax\n"
+                     "mov $0, %rax\n"
+                     "setge %al\n");
+      break;
+    case PUNCTUATION_greater_equal:
+      output_ast(ast->left);
+      strcat(output, "push %rax\n");
+      output_ast(ast->right);
+      strcat(output, "pop %rcx\n"
+                     "cmp %rax, %rcx\n"
+                     "mov $0, %rax\n"
+                     "setge %al\n");
+      break;
     }
   } else {
     fail(__LINE__);
