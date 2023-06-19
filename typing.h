@@ -8,6 +8,16 @@ enum TokenType{
     LITERAL, // literal
 };
 
+enum {
+    /* for those need two characters */
+    PUNCTUATION_logical_and = 'a', // &&
+    PUNCTUATION_logical_or  = 'b', // ||
+    PUNCTUATION_equal       = 'c', // ==
+    PUNCTUATION_not_equal   = 'd', // !=
+    PUNCTUATION_less_equal  = 'e', // <=
+    PUNCTUATION_greater_equal = 'f', // >=
+};
+
 typedef struct Token{
     enum TokenType type;
     /* https://stackoverflow.com/questions/1845482/what-is-the-uintptr-t-data-type */

@@ -44,8 +44,9 @@ bool is_keyword(Token token, enum KeywordType type){
   return token.type == KEYWORD && token.data == (uintptr_t) type;
 }
 
-void fail(){
-    assert(0);
+void fail(int line_number){
+  fprintf(stderr, "fail at line %d\n", line_number);
+  assert(0);
 }
 
 
@@ -63,9 +64,39 @@ int lex(char code[]){
       case '*':
       case '/':
       case '~':
-      case '!':
         tokens[token_counter++] = init_punctuation(code[code_counter]);
         code_counter++;
+        break;
+      case '!':
+      case '>':
+      case '<':   
+        if(code[code_counter+1] == '='){
+          if(code[code_counter] == '!')tokens[token_counter++] = init_punctuation(PUNCTUATION_not_equal);
+          else if(code[code_counter] == '>')tokens[token_counter++] = init_punctuation(PUNCTUATION_greater_equal);
+          else if(code[code_counter] == '<')tokens[token_counter++] = init_punctuation(PUNCTUATION_less_equal);
+          code_counter++;
+        }else{
+          tokens[token_counter++] = init_punctuation(code[code_counter]);
+        }
+        code_counter++;
+        break;
+      case '=':
+        if(code[code_counter+1] == '='){
+          tokens[token_counter++] = init_punctuation(PUNCTUATION_equal);
+          code_counter += 2;
+        }else{
+          fail(__LINE__); // assign is not implemented
+        }
+        break;
+      case '&':
+      case '|':
+        if(code[code_counter+1] == code[code_counter]){
+          if(code[code_counter] == '&')tokens[token_counter++] = init_punctuation(PUNCTUATION_equal);
+          else if(code[code_counter] == '|')tokens[token_counter++] = init_punctuation(PUNCTUATION_equal);
+          code_counter += 2;
+        }else{
+          fail(__LINE__); // bitwise and/or is not implemented
+        }
         break;
       case '\n':
         line_counter++;
@@ -113,59 +144,118 @@ void print_lex(Token tokens[], int token_count){
     puts("");
   }
 }
+AST *parse_expression(Token tokens[], int *counter);
+
+AST *parse_unary_expression(Token tokens[], int *counter){
+  AST *ret = (AST *)malloc(sizeof(AST));
+  /* unary*/
+  if(is_punctuation(tokens[(*counter)], '-') ||
+     is_punctuation(tokens[(*counter)], '~') ||
+     is_punctuation(tokens[(*counter)], '!')){
+    int type = (char) tokens[(*counter)].data;
+    (*counter)++;
+    *ret = (AST){
+        .ast_type = AST_unary_op,
+        .type = type,
+        .exp = parse_unary_expression(tokens, counter),
+    };
+    return ret;
+  }else if(tokens[(*counter)].type == LITERAL){ // literal
+    *ret = (AST){
+        .ast_type = AST_literal,
+        .type = KEYWORD_int,
+        .val = atoi((char *)tokens[(*counter)].data),
+    };
+    (*counter)++;
+  }else if(is_punctuation(tokens[(*counter)], '(')){
+    free(ret);
+    (*counter)++;
+    ret = parse_expression(tokens, counter);
+    assert(is_punctuation(tokens[(*counter)++], ')'));
+  }else{
+    fail(__LINE__);
+  }
+  return ret;
+}
 
 AST *parse_expression(Token tokens[], int *counter){
+  AST *left = parse_unary_expression(tokens, counter), *right;
+  /* binary op */
+  /* binary parse from left to right  */
+  if(is_punctuation(tokens[(*counter)], '+') ||
+     is_punctuation(tokens[(*counter)], '-') ||
+     is_punctuation(tokens[(*counter)], '*') ||
+     is_punctuation(tokens[(*counter)], '/')){ // TODO: deal with mul/div first -> add sub
+    char type = (char)tokens[(*counter)].data;
+    (*counter)++;
+    right = parse_unary_expression(tokens, counter);
+    // peek next op precedence // TODO: add precedence function
+    /**
+     * a - b * c
+     *    -
+     *   / \
+     *  a   *
+     *     / \
+     *    b   c
+     *
+     * a - b - c
+     *      -
+     *     / \
+     *    -   c
+     *   / \
+     *  a   b
+     * 
+     */
     AST *ret = (AST *)malloc(sizeof(AST));
-    /* unary */
-    if(is_punctuation(tokens[(*counter)], '-') ||
-       is_punctuation(tokens[(*counter)], '~') ||
-       is_punctuation(tokens[(*counter)], '!')){
-        int type = (char) tokens[(*counter)].data;
-        (*counter)++;
-        *ret = (AST){
-            .ast_type = AST_unary_op,
-            .type = type,
-            .exp = parse_expression(tokens, counter),
-        };
-        return ret;
-    }else if(tokens[(*counter)].type == LITERAL ||
-             is_punctuation(tokens[(*counter)], '(')){
-        AST *left;
-
-        if(tokens[(*counter)].type == LITERAL){
-            left = (AST *)malloc(sizeof(AST));
-            *left = (AST){
-                .ast_type = AST_literal,
-                .type = KEYWORD_int,
-                .val = atoi((char *)tokens[(*counter)].data),
-            };
-            (*counter)++;
-        }else if(is_punctuation(tokens[(*counter)], '(')){
-            (*counter)++;
-            left = parse_expression(tokens, counter);
-            assert(is_punctuation(tokens[(*counter)++], ')'));
-        }
-
-        /* binary op */
-        if(is_punctuation(tokens[(*counter)], '+') ||
-           is_punctuation(tokens[(*counter)], '-') ||
-           is_punctuation(tokens[(*counter)], '*') ||
-           is_punctuation(tokens[(*counter)], '/')){
-            char type = (char)tokens[(*counter)].data;
-            (*counter)++;
-            *ret = (AST){
-                .ast_type = AST_binary_op,
-                .type = type,
-                .left = left,
-                .right = parse_expression(tokens, counter),
-            };
-            return ret;
-        }
-
-        return left;
+    if((is_punctuation(tokens[(*counter)], '*') ||
+        is_punctuation(tokens[(*counter)], '/')) &&
+        (type == '+' || type == '-')){
+      char type2 = (char)tokens[(*counter)].data;
+      (*counter)++;
+      AST *new_right = (AST *)malloc(sizeof(AST));
+      *new_right = (AST){
+        .ast_type = AST_binary_op,
+        .type = type2,
+        .left = right,
+        .right = parse_expression(tokens, counter),
+      };
+      *ret = (AST){
+        .ast_type = AST_binary_op,
+        .type = type,
+        .left = left,
+        .right = new_right,
+      };
+    }else if(is_punctuation(tokens[(*counter)], '+') ||
+             is_punctuation(tokens[(*counter)], '-') ||
+             is_punctuation(tokens[(*counter)], '*') ||
+             is_punctuation(tokens[(*counter)], '/')){
+      char type2 = (char)tokens[(*counter)].data;
+      (*counter)++;
+      AST *sub_root = (AST *)malloc(sizeof(AST));
+      *sub_root = (AST){
+        .ast_type = AST_binary_op,
+        .type = type,
+        .left = left,
+        .right = right,
+      };
+      *ret = (AST){
+        .ast_type = AST_binary_op,
+        .type = type2,
+        .left = sub_root,
+        .right = parse_expression(tokens, counter),
+      };
+    }else{
+      *ret = (AST){
+        .ast_type = AST_binary_op,
+        .type = type,
+        .left = left,
+        .right = right,
+      };
     }
-    fail();
-    return NULL;
+    return ret;
+  }else{
+    return left;
+  }
 }
 
 AST *parse_statement(Token tokens[], int *counter){
@@ -179,7 +269,7 @@ AST *parse_statement(Token tokens[], int *counter){
         assert(is_punctuation(tokens[(*counter)++], ';'));
         return ret;
     }
-    fail();
+    fail(__LINE__);
     return NULL;
 }
 
@@ -206,10 +296,10 @@ AST *parse_function(Token tokens[], int *counter){
     assert(is_punctuation(tokens[(*counter)++], '}'));
 
     *ret = (AST){
-        .ast_type = AST_function,
-        .type = return_type,
-        .func_name = name,
-        .body = body,
+      .ast_type = AST_function,
+      .type = return_type,
+      .func_name = name,
+      .body = body,
     };
     return ret;
 }
@@ -269,7 +359,7 @@ void output_ast(AST *ast){
       strcat(output, "idiv %rbx\n");
     }
   }else{
-    fail();
+    fail(__LINE__);
   }
 }
 
