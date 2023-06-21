@@ -80,22 +80,12 @@ void fail(int line_number) {
   assert(0);
 }
 
-uintptr_t get_variable(char *name) {
-  for (int i = 0; i < var_count; i++) {
+int get_variable_offset(char *name) {
+  for (int i = 0; i < variables->size; i++) {
     if (!strcmp(name, variables->arr[i].name))
-      return variables->arr[i].data;
+      return variables->arr[i].offset;
   }
-  return (uintptr_t)NULL;
-}
-
-void set_variable(char *name, uintptr_t data) {
-  for (int i = 0; i < var_count; i++) {
-    if (!strcmp(name, variables->arr[i].name)) {
-      variables->arr[i].data = data;
-      return;
-    }
-  }
-  fail(__LINE__);
+  return -1;
 }
 
 enum KeywordType parse_keyword(char *word) {
@@ -469,18 +459,26 @@ AST *parse_ast(TokenVector *tokens) {
 }
 
 void output_ast(AST *ast) {
+  static int stack_offset;
+  int offset;
   if (ast->ast_type == AST_function) {
     sprintf(buf,
             ".globl %s\n"
             "%s:\n",
             ast->func_name, ast->func_name);
     strcat(output, buf);
-    for (int i = 0; i < ast->body->size; i++) {
+
+    // prologue
+    strcat(output, "push %rbp\n" "mov %rsp, %rbp\n" "mov $0, %rax\n");
+
+    stack_offset = -8;
+    for (int i = 0; i < ast->body->size; i++)
       output_ast(ast->body->arr[i]);
-    }
+
+    // epilogue
+    strcat(output, "mov %rbp, %rsp\n" "pop %rbp\n" "ret\n");
   } else if (ast->ast_type == AST_return) {
-    output_ast(ast->return_value);
-    strcat(output, "ret\n");
+    output_ast(ast->return_value); // put to rax and then return at function epilogue
   } else if (ast->ast_type == AST_literal) {
     sprintf(buf, "mov $%ld, %%rax\n", ast->val);
     strcat(output, buf);
@@ -683,11 +681,33 @@ void output_ast(AST *ast) {
       break;
     }
   } else if (ast->ast_type == AST_declare) {
-
+    if (get_variable_offset(ast->decl_name) != -1){
+      // redefinition
+      fail(__LINE__);
+    }
+    if (ast->decl_init){
+      output_ast(ast->decl_init);
+    } else {
+      // no initial value set to zero
+      strcat(output, "mov $0, %rax\n");
+    }
+    strcat(output, "push %rax\n");
+    push_back_variable(variables, (Variable){
+      .name = ast->decl_name,
+      .offset = stack_offset,
+    });
+    stack_offset -= 8;
   } else if (ast->ast_type == AST_assign) {
-
+    output_ast(ast->assign_ast);
+    offset = get_variable_offset(ast->assign_var_name);
+    assert(offset != -1);
+    sprintf(buf, "mov %%rax, %d(%%rbp)\n", offset);
+    strcat(output, buf);
   } else if (ast->ast_type == AST_variable) {
-
+    offset = get_variable_offset(ast->var_name);
+    assert(offset != -1);
+    sprintf(buf, "mov %d(%%rbp), %%rax\n", offset);
+    strcat(output, buf);
   } else {
     fprintf(stderr, "type:%d", ast->ast_type);
     fail(__LINE__);

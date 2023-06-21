@@ -51,9 +51,8 @@ extern Token peek_token(TokenVector *);
 extern Token next_token(TokenVector *);
 extern int getpos_token();
 typedef struct Variable{
-  enum KeywordType type;
   char *name;
-  uintptr_t data;
+  int offset; // offset on stack
 } Variable;
 
 typedef struct {
