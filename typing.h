@@ -35,13 +35,22 @@ enum KeywordType {
 };
 
 /* parser */
+typedef struct Variable{
+  enum KeywordType type;
+  char *name;
+  uintptr_t data;
+} Variable;
+
 
 enum ASTType {
   AST_literal,
   AST_function,
+  AST_declare,
   AST_return,
   AST_unary_op,
   AST_binary_op,
+  AST_assign,
+  AST_variable,
 };
 
 typedef struct AST {
@@ -58,8 +67,26 @@ typedef struct AST {
     /* declare function */
     struct {
       char *func_name;
-      struct AST *body;
+      struct AST **body;
     };
+
+    /* declare variable */
+    struct{
+      char *decl_name;
+      struct AST *decl_init;
+    };
+    
+    /* variable */
+    struct {
+      char *var_name;
+    };
+
+    /* variable assign */
+    struct {
+      char *assign_var_name;
+      struct AST *assign_ast;
+    };
+    
 
     /* Unary operator */
     struct {

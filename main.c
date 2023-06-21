@@ -10,11 +10,18 @@
 #include <unistd.h>
 #define MAX_CODE 0x1000
 #define BUF_SIZE 0x200
+#define MAX_LINE 0x200
+#define MAX_VAR 0x200
 
-Token tokens[MAX_CODE];
+Token tokens[MAX_CODE]; // TODO: vector
 char code[MAX_CODE];
 char output[MAX_CODE] = {0};
 char buf[BUF_SIZE];
+AST *lines[MAX_LINE];
+int line_count = 0;
+Variable variables[MAX_VAR];
+int var_count = 0;
+
 
 Token init_token(enum TokenType type, uintptr_t data) {
   return (Token){
@@ -80,6 +87,23 @@ void fail(int line_number) {
   assert(0);
 }
 
+uintptr_t get_variable(char *name){
+  for(int i=0;i<var_count;i++){
+    if(!strcmp(name, variables[i].name)) return variables[i].data;
+  }
+  return (uintptr_t)NULL;
+}
+
+void set_variable(char *name, uintptr_t data){
+  for(int i=0;i<var_count;i++){
+    if(!strcmp(name, variables[i].name)){
+      variables[i].data = data;
+      return;
+    }
+  }
+  fail(__LINE__);
+}
+
 enum KeywordType parse_keyword(char *word) {
   if (!strcmp(word, "return"))
     return KEYWORD_return;
@@ -122,13 +146,15 @@ int get_precedence(Token token) {
     return 11;
   case PUNCTUATION_logical_or:
     return 12;
+  case '=':
+    return 14;
   default:
     return 0;
   }
 }
 
 int lex(char code[]) {
-  int token_counter = 0, code_counter = 0, line_counter = 0, word_counter = 0;
+  int token_counter = 0, code_counter = 0, word_counter = 0;
   while (code[code_counter]) {
     switch (code[code_counter]) {
     case '{':
@@ -177,13 +203,6 @@ int lex(char code[]) {
       code_counter++;
       break;
     case '=':
-      if (code[code_counter + 1] == '=') {
-        tokens[token_counter++] = init_punctuation(PUNCTUATION_equal);
-        code_counter += 2;
-      } else {
-        fail(__LINE__); // assign is not implemented
-      }
-      break;
     case '&':
     case '|':
       if (code[code_counter + 1] == code[code_counter]) {
@@ -191,6 +210,8 @@ int lex(char code[]) {
           tokens[token_counter++] = init_punctuation(PUNCTUATION_logical_and);
         else if (code[code_counter] == '|')
           tokens[token_counter++] = init_punctuation(PUNCTUATION_logical_or);
+        else if (code[code_counter] == '=')
+          tokens[token_counter++] = init_punctuation(PUNCTUATION_equal);
         code_counter++;
       } else {
         tokens[token_counter++] = init_punctuation(code[code_counter]);
@@ -198,7 +219,6 @@ int lex(char code[]) {
       code_counter++;
       break;
     case '\n':
-      line_counter++;
     case ' ':
     case '\t':
     case '\r':
@@ -275,6 +295,24 @@ AST *parse_unary_expression(Token tokens[], int *counter) {
     (*counter)++;
     ret = parse_expression(tokens, counter);
     assert(is_punctuation(tokens[(*counter)++], ')'));
+  } else if (tokens[(*counter)].type == IDENTIFIER) {
+    char *name = (char *)tokens[(*counter)].data;
+    (*counter)++;
+    if(is_punctuation(tokens[(*counter)], '=')) {
+      (*counter)++;
+      *ret = (AST){
+        .ast_type = AST_assign,
+        .type = KEYWORD_int,
+        .assign_var_name = name,
+        .assign_ast = parse_expression(tokens, counter),
+      };
+    } else {
+      *ret = (AST){
+        .ast_type = AST_variable,
+        .type = KEYWORD_int,
+        .var_name = name,
+      };
+    }
   } else {
     fail(__LINE__);
   }
@@ -360,11 +398,37 @@ AST *parse_expression(Token tokens[], int *counter) {
 AST *parse_statement(Token tokens[], int *counter) {
   AST *ret = (AST *)malloc(sizeof(AST)); // TODO: prevent memory leak
   if (is_keyword(tokens[(*counter)], KEYWORD_return)) {
+    /* return value */
     (*counter)++;
     *ret = (AST){
         .ast_type = AST_return,
         .return_value = parse_expression(tokens, counter),
     };
+    assert(is_punctuation(tokens[(*counter)++], ';'));
+    return ret;
+  } else if(is_keyword(tokens[(*counter)], KEYWORD_int)) {
+    /* declare + assignment (optional)*/
+    (*counter)++;
+    assert(tokens[(*counter)].type == IDENTIFIER);
+    char *name = (char *)tokens[(*counter)].data;
+    (*counter)++;
+    AST *init_exp = NULL;
+
+    if(!is_punctuation(tokens[(*counter)], ';')){ // not end -> assign
+      assert(is_punctuation(tokens[(*counter)], '='));
+      init_exp = parse_expression(tokens, counter);
+    }
+    *ret = (AST){
+        .type = KEYWORD_int,
+        .ast_type = AST_declare,
+        .decl_name = name,
+        .decl_init = init_exp,
+    };
+    assert(is_punctuation(tokens[(*counter)++], ';'));
+    return ret;
+  } else if(tokens[(*counter)].type == IDENTIFIER){
+    /* assignment */
+    ret = parse_unary_expression(tokens, counter);
     assert(is_punctuation(tokens[(*counter)++], ';'));
     return ret;
   }
@@ -389,7 +453,11 @@ AST *parse_function(Token tokens[], int *counter) {
   /* { */
   assert(is_punctuation(tokens[(*counter)++], '{'));
 
-  AST *body = parse_statement(tokens, counter);
+  int origin_line_count = line_count; // TODO: add vector
+  while(!is_punctuation(tokens[(*counter)], '}')){
+    AST *body = parse_statement(tokens, counter);
+    lines[line_count++] = body;
+  }
 
   /* } */
   assert(is_punctuation(tokens[(*counter)++], '}'));
@@ -398,7 +466,7 @@ AST *parse_function(Token tokens[], int *counter) {
       .ast_type = AST_function,
       .type = return_type,
       .func_name = name,
-      .body = body,
+      .body = &lines[origin_line_count],
   };
   return ret;
 }
@@ -417,7 +485,9 @@ void output_ast(AST *ast) {
             "%s:\n",
             ast->func_name, ast->func_name);
     strcat(output, buf);
-    output_ast(ast->body);
+    for(int i=0; i<line_count; i++){ // only one function, no bug now TODO: change into ast vector
+      output_ast(ast->body[i]);
+    }
   } else if (ast->ast_type == AST_return) {
     output_ast(ast->return_value);
     strcat(output, "ret\n");
@@ -622,6 +692,10 @@ void output_ast(AST *ast) {
       fail(__LINE__);
       break;
     }
+  } else if (ast->ast_type == AST_declare) {
+
+  } else if (ast->ast_type == AST_assign) {
+
   } else {
     fail(__LINE__);
   }
