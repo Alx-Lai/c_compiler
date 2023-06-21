@@ -1,6 +1,9 @@
 #include <stdint.h>
 #include <string.h>
 
+#ifndef MY_TYPING_H
+#define MY_TYPING_H
+
 /* lexer */
 enum TokenType {
   PUNCTUATION, // {} [] () ; ~ ! + - * /
@@ -99,3 +102,5 @@ typedef struct AST {
     };
   };
 } AST;
+
+#endif

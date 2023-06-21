@@ -1,3 +1,4 @@
+#include "util.h"
 #include "typing.h"
 #include <assert.h>
 #include <ctype.h>
@@ -13,7 +14,7 @@
 #define MAX_LINE 0x200
 #define MAX_VAR 0x200
 
-Token tokens[MAX_CODE]; // TODO: vector
+// Token tokens[MAX_CODE]; // TODO: vector
 char code[MAX_CODE];
 char output[MAX_CODE] = {0};
 char buf[BUF_SIZE];
@@ -153,8 +154,8 @@ int get_precedence(Token token) {
   }
 }
 
-int lex(char code[]) {
-  int token_counter = 0, code_counter = 0, word_counter = 0;
+void lex(TokenVector *tokens, char code[]) {
+  int code_counter = 0, word_counter = 0;
   while (code[code_counter]) {
     switch (code[code_counter]) {
     case '{':
@@ -169,15 +170,15 @@ int lex(char code[]) {
     case '%':
     case '~':
     case '^':
-      tokens[token_counter++] = init_punctuation(code[code_counter]);
+      push_back_token(tokens, init_punctuation(code[code_counter]));
       code_counter++;
       break;
     case '!':
       if (code[code_counter + 1] == '=') {
-        tokens[token_counter++] = init_punctuation(PUNCTUATION_not_equal);
+        push_back_token(tokens, init_punctuation(PUNCTUATION_not_equal));
         code_counter++;
       } else {
-        tokens[token_counter++] = init_punctuation(code[code_counter]);
+        push_back_token(tokens, init_punctuation(code[code_counter]));
       }
       code_counter++;
       break;
@@ -185,20 +186,18 @@ int lex(char code[]) {
     case '<':
       if (code[code_counter + 1] == '=') {
         if (code[code_counter] == '>')
-          tokens[token_counter++] = init_punctuation(PUNCTUATION_greater_equal);
+          push_back_token(tokens, init_punctuation(PUNCTUATION_greater_equal));
         else if (code[code_counter] == '<')
-          tokens[token_counter++] = init_punctuation(PUNCTUATION_less_equal);
+          push_back_token(tokens, init_punctuation(PUNCTUATION_less_equal));
         code_counter++;
       } else if (code[code_counter] == code[code_counter + 1]) {
         if (code[code_counter] == '>')
-          tokens[token_counter++] =
-              init_punctuation(PUNCTUATION_bitwise_shift_right);
+          push_back_token(tokens, init_punctuation(PUNCTUATION_bitwise_shift_right));
         else if (code[code_counter] == '<')
-          tokens[token_counter++] =
-              init_punctuation(PUNCTUATION_bitwise_shift_left);
+          push_back_token(tokens, init_punctuation(PUNCTUATION_bitwise_shift_left));
         code_counter++;
       } else {
-        tokens[token_counter++] = init_punctuation(code[code_counter]);
+        push_back_token(tokens, init_punctuation(code[code_counter]));
       }
       code_counter++;
       break;
@@ -207,14 +206,14 @@ int lex(char code[]) {
     case '|':
       if (code[code_counter + 1] == code[code_counter]) {
         if (code[code_counter] == '&')
-          tokens[token_counter++] = init_punctuation(PUNCTUATION_logical_and);
+          push_back_token(tokens, init_punctuation(PUNCTUATION_logical_and));
         else if (code[code_counter] == '|')
-          tokens[token_counter++] = init_punctuation(PUNCTUATION_logical_or);
+          push_back_token(tokens, init_punctuation(PUNCTUATION_logical_or));
         else if (code[code_counter] == '=')
-          tokens[token_counter++] = init_punctuation(PUNCTUATION_equal);
+          push_back_token(tokens, init_punctuation(PUNCTUATION_equal));
         code_counter++;
       } else {
-        tokens[token_counter++] = init_punctuation(code[code_counter]);
+        push_back_token(tokens, init_punctuation(code[code_counter]));
       }
       code_counter++;
       break;
@@ -235,9 +234,9 @@ int lex(char code[]) {
         strcpy(name, buf);
         int keyword_type = parse_keyword(buf);
         if (keyword_type != KEYWORD_unknown) {
-          tokens[token_counter++] = init_keyword(keyword_type);
+          push_back_token(tokens, init_keyword(keyword_type));
         } else {
-          tokens[token_counter++] = init_identifier(name);
+          push_back_token(tokens, init_identifier(name));
         }
       } else if (isdigit(code[code_counter])) {
         do {
@@ -246,36 +245,35 @@ int lex(char code[]) {
         buf[word_counter] = '\0';
         char *name = (char *)malloc((word_counter + 1) * sizeof(char));
         strcpy(name, buf);
-        tokens[token_counter++] = init_token(LITERAL, (uintptr_t)name);
+        push_back_token(tokens, init_token(LITERAL, (uintptr_t)name));
       }
     }
   }
-  return token_counter;
 }
 
-void print_lex(Token tokens[], int token_count) {
-  for (int i = 0; i < token_count; i++) {
+void print_lex(TokenVector *tokens) {
+  for (int i = 0; i < tokens->size; i++) {
     printf("%03d:", i);
-    if (tokens[i].type == PUNCTUATION)
-      printf("PUNCTUATION%c ", (char)tokens[i].data);
-    if (tokens[i].type == KEYWORD)
-      printf("KEYWORD(%d) ", (int)tokens[i].data);
-    if (tokens[i].type == IDENTIFIER)
-      printf("IDENTIFIER(%s) ", (char *)tokens[i].data);
-    if (tokens[i].type == LITERAL)
-      printf("LITERAL(%s) ", (char *)tokens[i].data);
+    if (tokens->arr[i].type == PUNCTUATION)
+      printf("PUNCTUATION%c ", (char)tokens->arr[i].data);
+    if (tokens->arr[i].type == KEYWORD)
+      printf("KEYWORD(%d) ", (int)tokens->arr[i].data);
+    if (tokens->arr[i].type == IDENTIFIER)
+      printf("IDENTIFIER(%s) ", (char *)tokens->arr[i].data);
+    if (tokens->arr[i].type == LITERAL)
+      printf("LITERAL(%s) ", (char *)tokens->arr[i].data);
     puts("");
   }
 }
-AST *parse_expression(Token tokens[], int *counter);
+AST *parse_expression(TokenVector *tokens, int *counter);
 
-AST *parse_unary_expression(Token tokens[], int *counter) {
+AST *parse_unary_expression(TokenVector *tokens, int *counter) {
   AST *ret = (AST *)malloc(sizeof(AST));
   /* unary*/
-  if (is_punctuation(tokens[(*counter)], '-') ||
-      is_punctuation(tokens[(*counter)], '~') ||
-      is_punctuation(tokens[(*counter)], '!')) {
-    int type = (char)tokens[(*counter)].data;
+  if (is_punctuation(tokens->arr[(*counter)], '-') ||
+      is_punctuation(tokens->arr[(*counter)], '~') ||
+      is_punctuation(tokens->arr[(*counter)], '!')) {
+    int type = (char)tokens->arr[(*counter)].data;
     (*counter)++;
     *ret = (AST){
         .ast_type = AST_unary_op,
@@ -283,22 +281,22 @@ AST *parse_unary_expression(Token tokens[], int *counter) {
         .exp = parse_unary_expression(tokens, counter),
     };
     return ret;
-  } else if (tokens[(*counter)].type == LITERAL) { // literal
+  } else if (tokens->arr[(*counter)].type == LITERAL) { // literal
     *ret = (AST){
         .ast_type = AST_literal,
         .type = KEYWORD_int,
-        .val = atoi((char *)tokens[(*counter)].data),
+        .val = atoi((char *)tokens->arr[(*counter)].data),
     };
     (*counter)++;
-  } else if (is_punctuation(tokens[(*counter)], '(')) {
+  } else if (is_punctuation(tokens->arr[(*counter)], '(')) {
     free(ret);
     (*counter)++;
     ret = parse_expression(tokens, counter);
-    assert(is_punctuation(tokens[(*counter)++], ')'));
-  } else if (tokens[(*counter)].type == IDENTIFIER) {
-    char *name = (char *)tokens[(*counter)].data;
+    assert(is_punctuation(tokens->arr[(*counter)++], ')'));
+  } else if (tokens->arr[(*counter)].type == IDENTIFIER) {
+    char *name = (char *)tokens->arr[(*counter)].data;
     (*counter)++;
-    if(is_punctuation(tokens[(*counter)], '=')) {
+    if(is_punctuation(tokens->arr[(*counter)], '=')) {
       (*counter)++;
       *ret = (AST){
         .ast_type = AST_assign,
@@ -319,13 +317,13 @@ AST *parse_unary_expression(Token tokens[], int *counter) {
   return ret;
 }
 
-AST *parse_expression(Token tokens[], int *counter) {
+AST *parse_expression(TokenVector *tokens, int *counter) {
   AST *left = parse_unary_expression(tokens, counter), *right;
   /* binary op */
   /* binary parse from left to right  */
-  if (is_binary_op(tokens[(*counter)])) {
-    int pred_front = get_precedence(tokens[(*counter)]);
-    char type = (char)tokens[(*counter)].data;
+  if (is_binary_op(tokens->arr[(*counter)])) {
+    int pred_front = get_precedence(tokens->arr[(*counter)]);
+    char type = (char)tokens->arr[(*counter)].data;
     (*counter)++;
     right = parse_unary_expression(tokens, counter);
     // peek next op precedence
@@ -346,10 +344,10 @@ AST *parse_expression(Token tokens[], int *counter) {
      *
      */
     AST *ret = (AST *)malloc(sizeof(AST));
-    if (is_binary_op(tokens[(*counter)])) {
-      int pred_back = get_precedence(tokens[(*counter)]);
+    if (is_binary_op(tokens->arr[(*counter)])) {
+      int pred_back = get_precedence(tokens->arr[(*counter)]);
       if (pred_front > pred_back) {
-        char type2 = (char)tokens[(*counter)].data;
+        char type2 = (char)tokens->arr[(*counter)].data;
         (*counter)++;
         AST *new_right = (AST *)malloc(sizeof(AST));
         *new_right = (AST){
@@ -365,7 +363,7 @@ AST *parse_expression(Token tokens[], int *counter) {
             .right = new_right,
         };
       } else {
-        char type2 = (char)tokens[(*counter)].data;
+        char type2 = (char)tokens->arr[(*counter)].data;
         (*counter)++;
         AST *sub_root = (AST *)malloc(sizeof(AST));
         *sub_root = (AST){
@@ -395,27 +393,27 @@ AST *parse_expression(Token tokens[], int *counter) {
   }
 }
 
-AST *parse_statement(Token tokens[], int *counter) {
+AST *parse_statement(TokenVector *tokens, int *counter) {
   AST *ret = (AST *)malloc(sizeof(AST)); // TODO: prevent memory leak
-  if (is_keyword(tokens[(*counter)], KEYWORD_return)) {
+  if (is_keyword(tokens->arr[(*counter)], KEYWORD_return)) {
     /* return value */
     (*counter)++;
     *ret = (AST){
         .ast_type = AST_return,
         .return_value = parse_expression(tokens, counter),
     };
-    assert(is_punctuation(tokens[(*counter)++], ';'));
+    assert(is_punctuation(tokens->arr[(*counter)++], ';'));
     return ret;
-  } else if(is_keyword(tokens[(*counter)], KEYWORD_int)) {
+  } else if(is_keyword(tokens->arr[(*counter)], KEYWORD_int)) {
     /* declare + assignment (optional)*/
     (*counter)++;
-    assert(tokens[(*counter)].type == IDENTIFIER);
-    char *name = (char *)tokens[(*counter)].data;
+    assert(tokens->arr[(*counter)].type == IDENTIFIER);
+    char *name = (char *)tokens->arr[(*counter)].data;
     (*counter)++;
     AST *init_exp = NULL;
 
-    if(!is_punctuation(tokens[(*counter)], ';')){ // not end -> assign
-      assert(is_punctuation(tokens[(*counter)], '='));
+    if(!is_punctuation(tokens->arr[(*counter)], ';')){ // not end -> assign
+      assert(is_punctuation(tokens->arr[(*counter)], '='));
       init_exp = parse_expression(tokens, counter);
     }
     *ret = (AST){
@@ -424,43 +422,43 @@ AST *parse_statement(Token tokens[], int *counter) {
         .decl_name = name,
         .decl_init = init_exp,
     };
-    assert(is_punctuation(tokens[(*counter)++], ';'));
+    assert(is_punctuation(tokens->arr[(*counter)++], ';'));
     return ret;
-  } else if(tokens[(*counter)].type == IDENTIFIER){
+  } else if(tokens->arr[(*counter)].type == IDENTIFIER){
     /* assignment */
     ret = parse_unary_expression(tokens, counter);
-    assert(is_punctuation(tokens[(*counter)++], ';'));
+    assert(is_punctuation(tokens->arr[(*counter)++], ';'));
     return ret;
   }
   fail(__LINE__);
   return NULL;
 }
 
-AST *parse_function(Token tokens[], int *counter) {
+AST *parse_function(TokenVector *tokens, int *counter) {
   AST *ret = (AST *)malloc(sizeof(AST));
   /* int */
-  assert(is_keyword(tokens[(*counter)], KEYWORD_int));
-  int return_type = (enum KeywordType)tokens[(*counter)++].data;
+  assert(is_keyword(tokens->arr[(*counter)], KEYWORD_int));
+  int return_type = (enum KeywordType)tokens->arr[(*counter)++].data;
 
   /* main */
-  assert(tokens[*counter].type == IDENTIFIER);
-  char *name = (char *)tokens[(*counter)++].data;
+  assert(tokens->arr[*counter].type == IDENTIFIER);
+  char *name = (char *)tokens->arr[(*counter)++].data;
 
   /* () */
-  assert(is_punctuation(tokens[(*counter)++], '('));
-  assert(is_punctuation(tokens[(*counter)++], ')'));
+  assert(is_punctuation(tokens->arr[(*counter)++], '('));
+  assert(is_punctuation(tokens->arr[(*counter)++], ')'));
 
   /* { */
-  assert(is_punctuation(tokens[(*counter)++], '{'));
+  assert(is_punctuation(tokens->arr[(*counter)++], '{'));
 
   int origin_line_count = line_count; // TODO: add vector
-  while(!is_punctuation(tokens[(*counter)], '}')){
+  while(!is_punctuation(tokens->arr[(*counter)], '}')){
     AST *body = parse_statement(tokens, counter);
     lines[line_count++] = body;
   }
 
   /* } */
-  assert(is_punctuation(tokens[(*counter)++], '}'));
+  assert(is_punctuation(tokens->arr[(*counter)++], '}'));
 
   *ret = (AST){
       .ast_type = AST_function,
@@ -471,10 +469,10 @@ AST *parse_function(Token tokens[], int *counter) {
   return ret;
 }
 
-AST *parse_ast(Token tokens[], int token_count) {
+AST *parse_ast(TokenVector *tokens) {
   int counter = 0;
   AST *ret = parse_function(tokens, &counter);
-  assert(counter == token_count);
+  assert(counter == tokens->size);
   return ret;
 }
 
@@ -713,8 +711,9 @@ int main(int argc, char *argv[]) {
   int fd = open(argv[1], O_RDONLY);
   read(fd, code, MAX_CODE);
   close(fd);
-  int token_count = lex(code);
-  print_lex(tokens, token_count);
-  AST *ast = parse_ast(tokens, token_count);
+  TokenVector *tokens = init_token_vector();
+  lex(tokens, code);
+  print_lex(tokens);
+  AST *ast = parse_ast(tokens);
   output_program(ast);
 }
