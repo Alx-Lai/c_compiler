@@ -2,6 +2,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <fcntl.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -12,9 +13,9 @@
 #define BUF_SIZE 0x200
 
 char code[MAX_CODE];
-char output[MAX_CODE] = {0};
 char buf[BUF_SIZE];
 VariableVector *variables;
+FILE *output_f;
 
 Token init_token(enum TokenType type, uintptr_t data) {
   return (Token){
@@ -400,10 +401,10 @@ AST *parse_statement(TokenVector *tokens) {
     char *name = (char *)next_token(tokens).data;
     assert(is_punctuation(next_token(tokens), '='));
     *ret = (AST){
-      .type = KEYWORD_int,
-      .ast_type = AST_assign,
-      .assign_var_name = name,
-      .assign_ast = parse_unary_expression(tokens),
+        .type = KEYWORD_int,
+        .ast_type = AST_assign,
+        .assign_var_name = name,
+        .assign_ast = parse_unary_expression(tokens),
     };
     assert(is_punctuation(next_token(tokens), ';'));
     return ret;
@@ -458,40 +459,44 @@ AST *parse_ast(TokenVector *tokens) {
   return ret;
 }
 
+#define outf(...) fprintf(output_f, __VA_ARGS__)
+
 void output_ast(AST *ast) {
   static int stack_offset;
   int offset;
   if (ast->ast_type == AST_function) {
-    sprintf(buf,
-            ".globl %s\n"
-            "%s:\n",
-            ast->func_name, ast->func_name);
-    strcat(output, buf);
+    outf(".globl %s\n"
+         "%s:\n",
+         ast->func_name, ast->func_name);
 
     // prologue
-    strcat(output, "push %rbp\n" "mov %rsp, %rbp\n" "mov $0, %rax\n");
+    outf("push %%rbp\n"
+         "mov %%rsp, %%rbp\n"
+         "mov $0, %%rax\n");
 
     stack_offset = -8;
     for (int i = 0; i < ast->body->size; i++)
       output_ast(ast->body->arr[i]);
 
     // epilogue
-    strcat(output, "mov %rbp, %rsp\n" "pop %rbp\n" "ret\n");
+    outf("mov %%rbp, %%rsp\n"
+         "pop %%rbp\n"
+         "ret\n");
   } else if (ast->ast_type == AST_return) {
-    output_ast(ast->return_value); // put to rax and then return at function epilogue
+    output_ast(
+        ast->return_value); // put to rax and then return at function epilogue
   } else if (ast->ast_type == AST_literal) {
-    sprintf(buf, "mov $%ld, %%rax\n", ast->val);
-    strcat(output, buf);
+    outf("mov $%ld, %%rax\n", ast->val);
   } else if (ast->ast_type == AST_unary_op) {
     output_ast(ast->exp);
     if (ast->type == '-') {
-      strcat(output, "neg %rax\n");
+      outf("neg %%rax\n");
     } else if (ast->type == '!') {
-      strcat(output, "not %rax\n");
+      outf("not %%rax\n");
     } else if (ast->type == '~') {
-      strcat(output, "cmp $0, %rax\n"
-                     "mov $0, %rax\n"
-                     "sete %al\n");
+      outf("cmp $0, %%rax\n"
+           "mov $0, %%rax\n"
+           "sete %%al\n");
     }
   } else if (ast->ast_type == AST_binary_op) {
     // cannot push 32 bit reg in x64 machine
@@ -499,230 +504,221 @@ void output_ast(AST *ast) {
     switch (ast->type) {
     case '+':
       output_ast(ast->left);
-      strcat(output, "push %rax\n");
+      outf("push %%rax\n");
       output_ast(ast->right);
-      strcat(output, "pop %rcx\n"
-                     "add %rcx, %rax\n");
+      outf("pop %%rcx\n"
+           "add %%rcx, %%rax\n");
       break;
     case '-':
       /* sub rcx, rax ; rax = rax - rcx */
       output_ast(ast->left);
-      strcat(output, "push %rax\n");
+      outf("push %%rax\n");
       output_ast(ast->right);
-      strcat(output, "push %rax\n"
-                     "pop %rcx\n"
-                     "pop %rax\n"
-                     "sub %rcx, %rax\n");
+      outf("push %%rax\n"
+           "pop %%rcx\n"
+           "pop %%rax\n"
+           "sub %%rcx, %%rax\n");
       break;
     case '*':
       /* imul rbx ; rdx:rax = rbx*rax */
       output_ast(ast->left);
-      strcat(output, "push %rax\n");
+      outf("push %%rax\n");
       output_ast(ast->right);
-      strcat(output, "pop %rbx\n"
-                     "imul %rbx\n"); // don't care about overflow now
+      // don't care about overflow
+      outf("pop %%rbx\n"
+           "imul %%rbx\n");
       break;
     case '/':
       /* idiv rbx ; rax = rdx:rax / rbx, rdx = rdx:rax % rax  */
       output_ast(ast->left); // TODO: refactor
-      strcat(output, "push %rax\n");
+      outf("push %%rax\n");
       output_ast(ast->right);
-      strcat(output, "push %rax\n"      // denominator
-                     "xor %rdx, %rdx\n" // clean rdx
-                     "pop %rbx\n"
-                     "pop %rax\n" // don't care about overflow now
-                     "idiv %rbx\n");
+      outf("push %%rax\n"       // denominator
+           "xor %%rdx, %%rdx\n" // clean rdx
+           "pop %%rbx\n"
+           "pop %%rax\n" // don't care about overflow now
+           "idiv %%rbx\n");
       break;
     case PUNCTUATION_logical_and:
       counter = get_label_counter();
       output_ast(ast->left);
-      sprintf(buf,
-              "cmp $0, %%rax\n"
-              "jne _clause%d\n"
-              "jmp _end%d\n"
-              "_clause%d:\n",
-              counter, counter, counter);
-      strcat(output, buf);
+      outf("cmp $0, %%rax\n"
+           "jne _clause%d\n"
+           "jmp _end%d\n"
+           "_clause%d:\n",
+           counter, counter, counter);
       output_ast(ast->right);
-      sprintf(buf,
-              "cmp $0, %%rax\n"
-              "mov $0, %%rax\n"
-              "setne %%al\n"
-              "_end%d:\n",
-              counter);
-      strcat(output, buf);
+      outf("cmp $0, %%rax\n"
+           "mov $0, %%rax\n"
+           "setne %%al\n"
+           "_end%d:\n",
+           counter);
       break;
     case PUNCTUATION_logical_or:
       counter = get_label_counter();
       output_ast(ast->left);
-      sprintf(buf,
-              "cmp $0, %%rax\n"
-              "je _clause%d\n"
-              "mov $1, %%rax\n"
-              "jmp _end%d\n"
-              "_clause%d:\n",
-              counter, counter, counter);
-      strcat(output, buf);
+      outf("cmp $0, %%rax\n"
+           "je _clause%d\n"
+           "mov $1, %%rax\n"
+           "jmp _end%d\n"
+           "_clause%d:\n",
+           counter, counter, counter);
       output_ast(ast->right);
-      sprintf(buf,
-              "cmp $0, %%rax\n"
-              "mov $0, %%rax\n"
-              "setne %%al\n"
-              "_end%d:\n",
-              counter);
-      strcat(output, buf);
+      outf("cmp $0, %%rax\n"
+           "mov $0, %%rax\n"
+           "setne %%al\n"
+           "_end%d:\n",
+           counter);
       break;
     case PUNCTUATION_equal:
       output_ast(ast->left);
-      strcat(output, "push %rax\n");
+      outf("push %%rax\n");
       output_ast(ast->right);
-      strcat(output, "pop %rcx\n"
-                     "cmp %rax, %rcx\n"
-                     "mov $0, %rax\n" // use xor clean flags
-                     "sete %al\n");
+      outf("pop %%rcx\n"
+           "cmp %%rax, %%rcx\n"
+           "mov $0, %%rax\n" // use xor clean flags
+           "sete %%al\n");
       break;
     case PUNCTUATION_not_equal:
       output_ast(ast->left);
-      strcat(output, "push %rax\n");
+      outf("push %%rax\n");
       output_ast(ast->right);
-      strcat(output, "pop %rcx\n"
-                     "cmp %rax, %rcx\n"
-                     "mov $0, %rax\n"
-                     "setne %al\n");
+      outf("pop %%rcx\n"
+           "cmp %%rax, %%rcx\n"
+           "mov $0, %%rax\n"
+           "setne %%al\n");
       break;
     case '<':
       output_ast(ast->left);
-      strcat(output, "push %rax\n");
+      outf("push %%rax\n");
       output_ast(ast->right);
-      strcat(output, "pop %rcx\n"
-                     "cmp %rax, %rcx\n"
-                     "mov $0, %rax\n"
-                     "setl %al\n");
+      outf("pop %%rcx\n"
+           "cmp %%rax, %%rcx\n"
+           "mov $0, %%rax\n"
+           "setl %%al\n");
       break;
     case '>':
       output_ast(ast->left);
-      strcat(output, "push %rax\n");
+      outf("push %%rax\n");
       output_ast(ast->right);
-      strcat(output, "pop %rcx\n"
-                     "cmp %rcx, %rax\n"
-                     "mov $0, %rax\n"
-                     "setl %al\n");
+      outf("pop %%rcx\n"
+           "cmp %%rcx, %%rax\n"
+           "mov $0, %%rax\n"
+           "setl %%al\n");
       break;
     case PUNCTUATION_less_equal:
       output_ast(ast->left);
-      strcat(output, "push %rax\n");
+      outf("push %%rax\n");
       output_ast(ast->right);
-      strcat(output, "pop %rcx\n"
-                     "cmp %rcx, %rax\n"
-                     "mov $0, %rax\n"
-                     "setge %al\n");
+      outf("pop %%rcx\n"
+           "cmp %%rcx, %%rax\n"
+           "mov $0, %%rax\n"
+           "setge %%al\n");
       break;
     case PUNCTUATION_greater_equal:
       output_ast(ast->left);
-      strcat(output, "push %rax\n");
+      outf("push %%rax\n");
       output_ast(ast->right);
-      strcat(output, "pop %rcx\n"
-                     "cmp %rax, %rcx\n"
-                     "mov $0, %rax\n"
-                     "setge %al\n");
+      outf("pop %%rcx\n"
+           "cmp %%rax, %%rcx\n"
+           "mov $0, %%rax\n"
+           "setge %%al\n");
       break;
     case '%':
       /* idiv rbx ; rax = rdx:rax / rbx, rdx = rdx:rax % rax  */
       output_ast(ast->left); // TODO: refactor
-      strcat(output, "push %rax\n");
+      outf("push %%rax\n");
       output_ast(ast->right);
-      strcat(output, "push %rax\n"      // denominator
-                     "xor %rdx, %rdx\n" // clean rdx
-                     "pop %rbx\n"
-                     "pop %rax\n" // don't care about overflow now
-                     "idiv %rbx\n"
-                     "mov %rdx, %rax");
+      outf("push %%rax\n"       // denominator
+           "xor %%rdx, %%rdx\n" // clean rdx
+           "pop %%rbx\n"
+           "pop %%rax\n" // don't care about overflow now
+           "idiv %%rbx\n"
+           "mov %%rdx, %%rax");
       break;
     case '&':
       output_ast(ast->left);
-      strcat(output, "push %rax\n");
+      outf("push %%rax\n");
       output_ast(ast->right);
-      strcat(output, "pop %rcx\n"
-                     "and %rcx, %rax\n");
+      outf("pop %%rcx\n"
+           "and %%rcx, %%rax\n");
       break;
     case '|':
       output_ast(ast->left);
-      strcat(output, "push %rax\n");
+      outf("push %%rax\n");
       output_ast(ast->right);
-      strcat(output, "pop %rcx\n"
-                     "or %rcx, %rax\n");
+      outf("pop %%rcx\n"
+           "or %%rcx, %%rax\n");
       break;
     case '^':
       output_ast(ast->left);
-      strcat(output, "push %rax\n");
+      outf("push %%rax\n");
       output_ast(ast->right);
-      strcat(output, "pop %rcx\n"
-                     "xor %rcx, %rax\n");
+      outf("pop %%rcx\n"
+           "xor %%rcx, %%rax\n");
       break;
     case PUNCTUATION_bitwise_shift_left:
       output_ast(ast->left); // TODO: refactor
-      strcat(output, "push %rax\n");
+      outf("push %%rax\n");
       output_ast(ast->right);
-      strcat(output, "xor %rcx, %rcx\n"
-                     "mov %al, %cl\n"
-                     "pop %rax\n" // don't care about overflow now
-                     "shl %cl, %rax\n");
+      outf("xor %%rcx, %%rcx\n"
+           "mov %%al, %%cl\n"
+           "pop %%rax\n" // don't care about overflow
+           "shl %%cl, %%rax\n");
       break;
     case PUNCTUATION_bitwise_shift_right:
       output_ast(ast->left); // TODO: refactor
-      strcat(output, "push %rax\n");
+      outf("push %%rax\n");
       output_ast(ast->right);
-      strcat(output, "mov %rax, %rcx\n"
-                     "pop %rax\n" // don't care about overflow now
-                     "shr %cl, %rax\n");
+      outf("mov %%rax, %%rcx\n"
+           "pop %%rax\n" // don't care about overflow
+           "shr %%cl, %%rax\n");
       break;
     default:
       fail(__LINE__);
       break;
     }
   } else if (ast->ast_type == AST_declare) {
-    if (get_variable_offset(ast->decl_name) != -1){
+    if (get_variable_offset(ast->decl_name) != -1) {
       // redefinition
       fail(__LINE__);
     }
-    if (ast->decl_init){
+    if (ast->decl_init) {
       output_ast(ast->decl_init);
     } else {
       // no initial value set to zero
-      strcat(output, "mov $0, %rax\n");
+      outf("mov $0, %%rax\n");
     }
-    strcat(output, "push %rax\n");
+    outf("push %%rax\n");
     push_back_variable(variables, (Variable){
-      .name = ast->decl_name,
-      .offset = stack_offset,
-    });
+                                      .name = ast->decl_name,
+                                      .offset = stack_offset,
+                                  });
     stack_offset -= 8;
   } else if (ast->ast_type == AST_assign) {
     output_ast(ast->assign_ast);
     offset = get_variable_offset(ast->assign_var_name);
     assert(offset != -1);
-    sprintf(buf, "mov %%rax, %d(%%rbp)\n", offset);
-    strcat(output, buf);
+    outf("mov %%rax, %d(%%rbp)\n", offset);
   } else if (ast->ast_type == AST_variable) {
     offset = get_variable_offset(ast->var_name);
     assert(offset != -1);
-    sprintf(buf, "mov %d(%%rbp), %%rax\n", offset);
-    strcat(output, buf);
+    outf("mov %d(%%rbp), %%rax\n", offset);
   } else {
     fprintf(stderr, "type:%d", ast->ast_type);
     fail(__LINE__);
   }
 }
 
-void print_ast(AST *ast){
-  switch (ast->ast_type){
+void print_ast(AST *ast) {
+  switch (ast->ast_type) {
   case AST_literal:
     printf("%ld", ast->val);
     break;
   case AST_function:
     assert(ast->type == KEYWORD_int);
     printf("int %s() {\n", ast->func_name);
-    for(int i=0;i<ast->body->size;i++){
+    for (int i = 0; i < ast->body->size; i++) {
       print_ast(ast->body->arr[i]);
       printf(";\n");
     }
@@ -731,7 +727,7 @@ void print_ast(AST *ast){
   case AST_declare:
     assert(ast->type == KEYWORD_int);
     printf("int %s", ast->decl_name);
-    if(ast->decl_init){
+    if (ast->decl_init) {
       printf(" = ");
       print_ast(ast->decl_init);
     }
@@ -741,7 +737,7 @@ void print_ast(AST *ast){
     print_ast(ast->return_value);
     break;
   case AST_unary_op:
-    switch (ast->type){
+    switch (ast->type) {
     case PUNCTUATION_logical_and:
       printf(" && ");
       break;
@@ -792,10 +788,9 @@ void print_ast(AST *ast){
 }
 
 void output_program(AST *ast) {
+  output_f = fopen("a.s", "w");
   output_ast(ast);
-  int fd = open("a.s", O_WRONLY | O_CREAT | O_TRUNC, 0644);
-  write(fd, output, strlen(output));
-  close(fd);
+  fclose(output_f);
 }
 
 int main(int argc, char *argv[]) {
