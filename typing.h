@@ -24,7 +24,7 @@ enum {
   PUNCTUATION_bitwise_shift_right = 'h', // >>
 };
 
-typedef struct Token {
+typedef struct {
   enum TokenType type;
   /* https://stackoverflow.com/questions/1845482/what-is-the-uintptr-t-data-type
    */
@@ -46,6 +46,10 @@ enum KeywordType {
 };
 
 /* parser */
+extern void seek_token(int);
+extern Token peek_token(TokenVector *);
+extern Token next_token(TokenVector *);
+extern int getpos_token();
 typedef struct Variable{
   enum KeywordType type;
   char *name;

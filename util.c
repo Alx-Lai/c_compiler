@@ -23,6 +23,21 @@ void push_back_token(TokenVector *vec, Token t) {
   vec->arr[vec->size++] = t;
 }
 
+static int token_pointer;
+void seek_token(int x){
+    token_pointer = x;
+}
+Token peek_token(TokenVector *vec){
+    return vec->arr[token_pointer];
+}
+Token next_token(TokenVector *vec){
+    return vec->arr[token_pointer++];
+}
+int getpos_token(){
+    return token_pointer;
+}
+
+
 ASTVector *init_AST_vector() { // TODO: move to util.c
   ASTVector *ret = (ASTVector *)malloc(sizeof(ASTVector));
   AST **arr = (AST **)malloc(2 * sizeof(AST *));

@@ -266,44 +266,41 @@ void print_lex(TokenVector *tokens) {
     puts("");
   }
 }
-AST *parse_expression(TokenVector *tokens, int *counter);
+AST *parse_expression(TokenVector *tokens);
 
-AST *parse_unary_expression(TokenVector *tokens, int *counter) {
+AST *parse_unary_expression(TokenVector *tokens) {
   AST *ret = (AST *)malloc(sizeof(AST));
   /* unary*/
-  if (is_punctuation(tokens->arr[(*counter)], '-') ||
-      is_punctuation(tokens->arr[(*counter)], '~') ||
-      is_punctuation(tokens->arr[(*counter)], '!')) {
-    int type = (char)tokens->arr[(*counter)].data;
-    (*counter)++;
+  if (is_punctuation(peek_token(tokens), '-') ||
+      is_punctuation(peek_token(tokens), '~') ||
+      is_punctuation(peek_token(tokens), '!')) {
+    int type = (char)next_token(tokens).data;
     *ret = (AST){
         .ast_type = AST_unary_op,
         .type = type,
-        .exp = parse_unary_expression(tokens, counter),
+        .exp = parse_unary_expression(tokens),
     };
     return ret;
-  } else if (tokens->arr[(*counter)].type == LITERAL) { // literal
+  } else if (peek_token(tokens).type == LITERAL) { // literal
     *ret = (AST){
         .ast_type = AST_literal,
         .type = KEYWORD_int,
-        .val = atoi((char *)tokens->arr[(*counter)].data),
+        .val = atoi((char *)next_token(tokens).data),
     };
-    (*counter)++;
-  } else if (is_punctuation(tokens->arr[(*counter)], '(')) {
+  } else if (is_punctuation(peek_token(tokens), '(')) {
     free(ret);
-    (*counter)++;
-    ret = parse_expression(tokens, counter);
-    assert(is_punctuation(tokens->arr[(*counter)++], ')'));
-  } else if (tokens->arr[(*counter)].type == IDENTIFIER) {
-    char *name = (char *)tokens->arr[(*counter)].data;
-    (*counter)++;
-    if (is_punctuation(tokens->arr[(*counter)], '=')) {
-      (*counter)++;
+    next_token(tokens);
+    ret = parse_expression(tokens);
+    assert(is_punctuation(next_token(tokens), ')'));
+  } else if (peek_token(tokens).type == IDENTIFIER) {
+    char *name = (char *)next_token(tokens).data;
+    if (is_punctuation(peek_token(tokens), '=')) {
+      next_token(tokens);
       *ret = (AST){
           .ast_type = AST_assign,
           .type = KEYWORD_int,
           .assign_var_name = name,
-          .assign_ast = parse_expression(tokens, counter),
+          .assign_ast = parse_expression(tokens),
       };
     } else {
       *ret = (AST){
@@ -318,15 +315,14 @@ AST *parse_unary_expression(TokenVector *tokens, int *counter) {
   return ret;
 }
 
-AST *parse_expression(TokenVector *tokens, int *counter) {
-  AST *left = parse_unary_expression(tokens, counter), *right;
+AST *parse_expression(TokenVector *tokens) {
+  AST *left = parse_unary_expression(tokens), *right;
   /* binary op */
   /* binary parse from left to right  */
-  if (is_binary_op(tokens->arr[(*counter)])) {
-    int pred_front = get_precedence(tokens->arr[(*counter)]);
-    char type = (char)tokens->arr[(*counter)].data;
-    (*counter)++;
-    right = parse_unary_expression(tokens, counter);
+  if (is_binary_op(peek_token(tokens))) {
+    int pred_front = get_precedence(peek_token(tokens));
+    char type = (char)next_token(tokens).data;
+    right = parse_unary_expression(tokens);
     // peek next op precedence
     /**
      * a - b * c
@@ -345,17 +341,16 @@ AST *parse_expression(TokenVector *tokens, int *counter) {
      *
      */
     AST *ret = (AST *)malloc(sizeof(AST));
-    if (is_binary_op(tokens->arr[(*counter)])) {
-      int pred_back = get_precedence(tokens->arr[(*counter)]);
+    if (is_binary_op(peek_token(tokens))) {
+      int pred_back = get_precedence(peek_token(tokens));
       if (pred_front > pred_back) {
-        char type2 = (char)tokens->arr[(*counter)].data;
-        (*counter)++;
+        char type2 = (char)next_token(tokens).data;
         AST *new_right = (AST *)malloc(sizeof(AST));
         *new_right = (AST){
             .ast_type = AST_binary_op,
             .type = type2,
             .left = right,
-            .right = parse_expression(tokens, counter),
+            .right = parse_expression(tokens),
         };
         *ret = (AST){
             .ast_type = AST_binary_op,
@@ -364,8 +359,7 @@ AST *parse_expression(TokenVector *tokens, int *counter) {
             .right = new_right,
         };
       } else {
-        char type2 = (char)tokens->arr[(*counter)].data;
-        (*counter)++;
+        char type2 = (char)next_token(tokens).data;
         AST *sub_root = (AST *)malloc(sizeof(AST));
         *sub_root = (AST){
             .ast_type = AST_binary_op,
@@ -377,7 +371,7 @@ AST *parse_expression(TokenVector *tokens, int *counter) {
             .ast_type = AST_binary_op,
             .type = type2,
             .left = sub_root,
-            .right = parse_expression(tokens, counter),
+            .right = parse_expression(tokens),
         };
       }
     } else {
@@ -394,28 +388,27 @@ AST *parse_expression(TokenVector *tokens, int *counter) {
   }
 }
 
-AST *parse_statement(TokenVector *tokens, int *counter) {
+AST *parse_statement(TokenVector *tokens) {
   AST *ret = (AST *)malloc(sizeof(AST)); // TODO: prevent memory leak
-  if (is_keyword(tokens->arr[(*counter)], KEYWORD_return)) {
+  if (is_keyword(peek_token(tokens), KEYWORD_return)) {
     /* return value */
-    (*counter)++;
+    next_token(tokens);
     *ret = (AST){
         .ast_type = AST_return,
-        .return_value = parse_expression(tokens, counter),
+        .return_value = parse_expression(tokens),
     };
-    assert(is_punctuation(tokens->arr[(*counter)++], ';'));
+    assert(is_punctuation(next_token(tokens), ';'));
     return ret;
-  } else if (is_keyword(tokens->arr[(*counter)], KEYWORD_int)) {
+  } else if (is_keyword(peek_token(tokens), KEYWORD_int)) {
     /* declare + assignment (optional)*/
-    (*counter)++;
-    assert(tokens->arr[(*counter)].type == IDENTIFIER);
-    char *name = (char *)tokens->arr[(*counter)].data;
-    (*counter)++;
+    next_token(tokens);
+    assert(peek_token(tokens).type == IDENTIFIER);
+    char *name = (char *)next_token(tokens).data;
     AST *init_exp = NULL;
 
-    if (!is_punctuation(tokens->arr[(*counter)], ';')) { // not end -> assign
-      assert(is_punctuation(tokens->arr[(*counter)], '='));
-      init_exp = parse_expression(tokens, counter);
+    if (!is_punctuation(peek_token(tokens), ';')) { // not end -> assign
+      assert(is_punctuation(peek_token(tokens), '='));
+      init_exp = parse_expression(tokens);
     }
     *ret = (AST){
         .type = KEYWORD_int,
@@ -423,43 +416,43 @@ AST *parse_statement(TokenVector *tokens, int *counter) {
         .decl_name = name,
         .decl_init = init_exp,
     };
-    assert(is_punctuation(tokens->arr[(*counter)++], ';'));
+    assert(is_punctuation(next_token(tokens), ';'));
     return ret;
-  } else if (tokens->arr[(*counter)].type == IDENTIFIER) {
+  } else if (peek_token(tokens).type == IDENTIFIER) {
     /* assignment */
-    ret = parse_unary_expression(tokens, counter);
-    assert(is_punctuation(tokens->arr[(*counter)++], ';'));
+    ret = parse_unary_expression(tokens);
+    assert(is_punctuation(next_token(tokens), ';'));
     return ret;
   }
   fail(__LINE__);
   return NULL;
 }
 
-AST *parse_function(TokenVector *tokens, int *counter) {
+AST *parse_function(TokenVector *tokens) {
   AST *ret = (AST *)malloc(sizeof(AST));
   /* int */
-  assert(is_keyword(tokens->arr[(*counter)], KEYWORD_int));
-  int return_type = (enum KeywordType)tokens->arr[(*counter)++].data;
+  assert(is_keyword(peek_token(tokens), KEYWORD_int));
+  int return_type = (enum KeywordType)next_token(tokens).data;
 
   /* main */
-  assert(tokens->arr[*counter].type == IDENTIFIER);
-  char *name = (char *)tokens->arr[(*counter)++].data;
+  assert(peek_token(tokens).type == IDENTIFIER);
+  char *name = (char *)next_token(tokens).data;
 
   /* () */
-  assert(is_punctuation(tokens->arr[(*counter)++], '('));
-  assert(is_punctuation(tokens->arr[(*counter)++], ')'));
+  assert(is_punctuation(next_token(tokens), '('));
+  assert(is_punctuation(next_token(tokens), ')'));
 
   /* { */
-  assert(is_punctuation(tokens->arr[(*counter)++], '{'));
+  assert(is_punctuation(next_token(tokens), '{'));
 
   ASTVector *body = init_AST_vector();
-  while (!is_punctuation(tokens->arr[(*counter)], '}')) {
-    AST *statement = parse_statement(tokens, counter);
+  while (!is_punctuation(peek_token(tokens), '}')) {
+    AST *statement = parse_statement(tokens);
     push_back_AST(body, statement);
   }
 
   /* } */
-  assert(is_punctuation(tokens->arr[(*counter)++], '}'));
+  assert(is_punctuation(next_token(tokens), '}'));
 
   *ret = (AST){
       .ast_type = AST_function,
@@ -471,9 +464,9 @@ AST *parse_function(TokenVector *tokens, int *counter) {
 }
 
 AST *parse_ast(TokenVector *tokens) {
-  int counter = 0;
-  AST *ret = parse_function(tokens, &counter);
-  assert(counter == tokens->size);
+  seek_token(0);
+  AST *ret = parse_function(tokens);
+  assert(getpos_token() == tokens->size);
   return ret;
 }
 
