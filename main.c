@@ -325,20 +325,12 @@ AST *parse_expression(TokenVector *tokens) {
     right = parse_unary_expression(tokens);
     // peek next op precedence
     /**
-     * a - b * c
-     *    -
-     *   / \
-     *  a   *
-     *     / \
-     *    b   c
-     *
-     * a - b - c
-     *      -
-     *     / \
-     *    -   c
-     *   / \
-     *  a   b
-     *
+     * a - b * c      *  a - b - c
+     *    -           *      -
+     *   / \          *     / \
+     *  a   *         *    -   c
+     *     / \        *   / \
+     *    b   c       *  a   b
      */
     AST *ret = (AST *)malloc(sizeof(AST));
     if (is_binary_op(peek_token(tokens))) {
@@ -400,14 +392,15 @@ AST *parse_statement(TokenVector *tokens) {
     assert(is_punctuation(next_token(tokens), ';'));
     return ret;
   } else if (is_keyword(peek_token(tokens), KEYWORD_int)) {
-    /* declare + assignment (optional)*/
+    /* declare and assignment (optional)*/
     next_token(tokens);
     assert(peek_token(tokens).type == IDENTIFIER);
     char *name = (char *)next_token(tokens).data;
     AST *init_exp = NULL;
 
-    if (!is_punctuation(peek_token(tokens), ';')) { // not end -> assign
-      assert(is_punctuation(peek_token(tokens), '='));
+    if (!is_punctuation(peek_token(tokens), ';')) {
+      // haven't end -> assignment
+      assert(is_punctuation(next_token(tokens), '='));
       init_exp = parse_expression(tokens);
     }
     *ret = (AST){
@@ -420,7 +413,14 @@ AST *parse_statement(TokenVector *tokens) {
     return ret;
   } else if (peek_token(tokens).type == IDENTIFIER) {
     /* assignment */
-    ret = parse_unary_expression(tokens);
+    char *name = (char *)next_token(tokens).data;
+    assert(is_punctuation(next_token(tokens), '='));
+    *ret = (AST){
+      .type = KEYWORD_int,
+      .ast_type = AST_assign,
+      .assign_var_name = name,
+      .assign_ast = parse_unary_expression(tokens),
+    };
     assert(is_punctuation(next_token(tokens), ';'));
     return ret;
   }
@@ -688,8 +688,88 @@ void output_ast(AST *ast) {
 
   } else if (ast->ast_type == AST_assign) {
 
+  } else if (ast->ast_type == AST_variable) {
+
   } else {
+    fprintf(stderr, "type:%d", ast->ast_type);
     fail(__LINE__);
+  }
+}
+
+void print_ast(AST *ast){
+  switch (ast->ast_type){
+  case AST_literal:
+    printf("%ld", ast->val);
+    break;
+  case AST_function:
+    assert(ast->type == KEYWORD_int);
+    printf("int %s() {\n", ast->func_name);
+    for(int i=0;i<ast->body->size;i++){
+      print_ast(ast->body->arr[i]);
+      printf(";\n");
+    }
+    printf("}\n");
+    break;
+  case AST_declare:
+    assert(ast->type == KEYWORD_int);
+    printf("int %s", ast->decl_name);
+    if(ast->decl_init){
+      printf(" = ");
+      print_ast(ast->decl_init);
+    }
+    break;
+  case AST_return:
+    printf("return ");
+    print_ast(ast->return_value);
+    break;
+  case AST_unary_op:
+    switch (ast->type){
+    case PUNCTUATION_logical_and:
+      printf(" && ");
+      break;
+    case PUNCTUATION_logical_or:
+      printf(" || ");
+      break;
+    case PUNCTUATION_equal:
+      printf(" == ");
+      break;
+    case PUNCTUATION_not_equal:
+      printf(" != ");
+      break;
+    case PUNCTUATION_less_equal:
+      printf(" <= ");
+      break;
+    case PUNCTUATION_greater_equal:
+      printf(" >= ");
+      break;
+    case PUNCTUATION_bitwise_shift_left:
+      printf(" << ");
+      break;
+    case PUNCTUATION_bitwise_shift_right:
+      printf(" >> ");
+      break;
+    default:
+      printf(" %c ", ast->type);
+      break;
+    }
+    print_ast(ast->exp);
+    break;
+  case AST_binary_op:
+    print_ast(ast->left);
+    printf(" %c ", ast->type);
+    print_ast(ast->right);
+    break;
+  case AST_assign:
+    assert(ast->type == KEYWORD_int);
+    printf("%s = ", ast->assign_var_name);
+    print_ast(ast->assign_ast);
+    break;
+  case AST_variable:
+    printf("%s", ast->var_name);
+    break;
+  default:
+    fail(__LINE__);
+    break;
   }
 }
 
@@ -709,5 +789,6 @@ int main(int argc, char *argv[]) {
   lex(tokens, code);
   print_lex(tokens);
   AST *ast = parse_ast(tokens);
+  print_ast(ast);
   output_program(ast);
 }
