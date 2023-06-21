@@ -14,13 +14,13 @@ enum TokenType {
 
 enum {
   /* for those need two characters */
-  PUNCTUATION_logical_and = 'a',         // &&
-  PUNCTUATION_logical_or = 'b',          // ||
-  PUNCTUATION_equal = 'c',               // ==
-  PUNCTUATION_not_equal = 'd',           // !=
-  PUNCTUATION_less_equal = 'e',          // <=
-  PUNCTUATION_greater_equal = 'f',       // >=
-  PUNCTUATION_bitwise_shift_left = 'g',  // <<
+  PUNCTUATION_logical_and = 'a',   // &&
+  PUNCTUATION_logical_or = 'b',    // ||
+  PUNCTUATION_equal = 'c',         // ==
+  PUNCTUATION_not_equal = 'd',     // !=
+  PUNCTUATION_less_equal = 'e',    // <=
+  PUNCTUATION_greater_equal = 'f', // >=
+  PUNCTUATION_bitwise_shift_left = 'g', // <<
   PUNCTUATION_bitwise_shift_right = 'h', // >>
 };
 
@@ -32,8 +32,8 @@ typedef struct Token {
 } Token;
 
 typedef struct {
-  size_t size, capacity;
-  Token *arr;
+    size_t size, capacity;
+    Token *arr;
 } TokenVector;
 /* util.c */
 extern TokenVector *init_token_vector();
@@ -46,11 +46,12 @@ enum KeywordType {
 };
 
 /* parser */
-typedef struct Variable {
+typedef struct Variable{
   enum KeywordType type;
   char *name;
   uintptr_t data;
 } Variable;
+
 
 enum ASTType {
   AST_literal,
@@ -62,6 +63,15 @@ enum ASTType {
   AST_assign,
   AST_variable,
 };
+
+struct AST;
+typedef struct {
+    size_t size, capacity;
+    struct AST **arr;
+} ASTVector;
+/* util.c */
+extern ASTVector *init_AST_vector();
+extern void push_back_AST(ASTVector *, struct AST *);
 
 typedef struct AST {
   int ast_type;
@@ -77,15 +87,15 @@ typedef struct AST {
     /* declare function */
     struct {
       char *func_name;
-      struct AST **body;
+      ASTVector *body;
     };
 
     /* declare variable */
-    struct {
+    struct{
       char *decl_name;
       struct AST *decl_init;
     };
-
+    
     /* variable */
     struct {
       char *var_name;
@@ -96,6 +106,7 @@ typedef struct AST {
       char *assign_var_name;
       struct AST *assign_ast;
     };
+    
 
     /* Unary operator */
     struct {

@@ -452,10 +452,10 @@ AST *parse_function(TokenVector *tokens, int *counter) {
   /* { */
   assert(is_punctuation(tokens->arr[(*counter)++], '{'));
 
-  int origin_line_count = line_count; // TODO: add vector
+  ASTVector *body = init_AST_vector();
   while (!is_punctuation(tokens->arr[(*counter)], '}')) {
-    AST *body = parse_statement(tokens, counter);
-    lines[line_count++] = body;
+    AST *statement = parse_statement(tokens, counter);
+    push_back_AST(body, statement);
   }
 
   /* } */
@@ -465,7 +465,7 @@ AST *parse_function(TokenVector *tokens, int *counter) {
       .ast_type = AST_function,
       .type = return_type,
       .func_name = name,
-      .body = &lines[origin_line_count],
+      .body = body,
   };
   return ret;
 }
@@ -484,9 +484,8 @@ void output_ast(AST *ast) {
             "%s:\n",
             ast->func_name, ast->func_name);
     strcat(output, buf);
-    for (int i = 0; i < line_count;
-         i++) { // only one function, no bug now TODO: change into ast vector
-      output_ast(ast->body[i]);
+    for (int i = 0; i < ast->body->size; i++) {
+      output_ast(ast->body->arr[i]);
     }
   } else if (ast->ast_type == AST_return) {
     output_ast(ast->return_value);

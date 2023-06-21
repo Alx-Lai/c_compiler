@@ -22,3 +22,24 @@ void push_back_token(TokenVector *vec, Token t) {
   }
   vec->arr[vec->size++] = t;
 }
+
+ASTVector *init_AST_vector() { // TODO: move to util.c
+  ASTVector *ret = (ASTVector *)malloc(sizeof(ASTVector));
+  AST **arr = (AST **)malloc(2 * sizeof(AST *));
+  *ret = (ASTVector){
+      .size = 0,
+      .capacity = 2,
+      .arr = arr,
+  };
+  return ret;
+};
+
+void push_back_AST(ASTVector *vec, AST *ast) {
+  if (vec->size == vec->capacity) {
+    vec->capacity *= 2;
+    AST **newarr = (AST **)realloc(vec->arr, vec->capacity * sizeof(AST *));
+    assert(newarr);
+    vec->arr = newarr;
+  }
+  vec->arr[vec->size++] = ast;
+}
