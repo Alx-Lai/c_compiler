@@ -56,6 +56,13 @@ typedef struct Variable{
   uintptr_t data;
 } Variable;
 
+typedef struct {
+    size_t size, capacity;
+    Variable *arr;
+} VariableVector;
+extern VariableVector *init_variable_vector();
+extern void push_back_variable(VariableVector *, Variable);
+
 
 enum ASTType {
   AST_literal,

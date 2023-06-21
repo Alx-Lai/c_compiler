@@ -10,17 +10,11 @@
 #include <unistd.h>
 #define MAX_CODE 0x1000
 #define BUF_SIZE 0x200
-#define MAX_LINE 0x200
-#define MAX_VAR 0x200
 
-// Token tokens[MAX_CODE]; // TODO: vector
 char code[MAX_CODE];
 char output[MAX_CODE] = {0};
 char buf[BUF_SIZE];
-AST *lines[MAX_LINE];
-int line_count = 0;
-Variable variables[MAX_VAR];
-int var_count = 0;
+VariableVector *variables;
 
 Token init_token(enum TokenType type, uintptr_t data) {
   return (Token){
@@ -88,16 +82,16 @@ void fail(int line_number) {
 
 uintptr_t get_variable(char *name) {
   for (int i = 0; i < var_count; i++) {
-    if (!strcmp(name, variables[i].name))
-      return variables[i].data;
+    if (!strcmp(name, variables->arr[i].name))
+      return variables->arr[i].data;
   }
   return (uintptr_t)NULL;
 }
 
 void set_variable(char *name, uintptr_t data) {
   for (int i = 0; i < var_count; i++) {
-    if (!strcmp(name, variables[i].name)) {
-      variables[i].data = data;
+    if (!strcmp(name, variables->arr[i].name)) {
+      variables->arr[i].data = data;
       return;
     }
   }
@@ -423,8 +417,12 @@ AST *parse_statement(TokenVector *tokens) {
     };
     assert(is_punctuation(next_token(tokens), ';'));
     return ret;
+  } else {
+    /* else = useless expression */
+    ret = parse_expression(tokens);
+    assert(is_punctuation(next_token(tokens), ';'));
+    return ret;
   }
-  fail(__LINE__);
   return NULL;
 }
 
@@ -785,10 +783,15 @@ int main(int argc, char *argv[]) {
   int fd = open(argv[1], O_RDONLY);
   read(fd, code, MAX_CODE);
   close(fd);
+
   TokenVector *tokens = init_token_vector();
+  variables = init_variable_vector();
+
   lex(tokens, code);
   print_lex(tokens);
+
   AST *ast = parse_ast(tokens);
   print_ast(ast);
+
   output_program(ast);
 }

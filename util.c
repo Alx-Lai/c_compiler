@@ -47,7 +47,7 @@ ASTVector *init_AST_vector() { // TODO: move to util.c
       .arr = arr,
   };
   return ret;
-};
+}
 
 void push_back_AST(ASTVector *vec, AST *ast) {
   if (vec->size == vec->capacity) {
@@ -57,4 +57,25 @@ void push_back_AST(ASTVector *vec, AST *ast) {
     vec->arr = newarr;
   }
   vec->arr[vec->size++] = ast;
+}
+
+VariableVector *init_variable_vector(){
+  VariableVector *ret = (VariableVector *)malloc(sizeof(VariableVector));
+  Variable *arr = (Variable *)malloc(2 * sizeof(Variable));
+  *ret = (VariableVector){
+      .size = 0,
+      .capacity = 2,
+      .arr = arr,
+  };
+  return ret;
+}
+
+void push_back_variable(VariableVector *vec, Variable v){
+  if (vec->size == vec->capacity) {
+    vec->capacity *= 2;
+    Variable *newarr = (Variable *)realloc(vec->arr, vec->capacity * sizeof(Variable));
+    assert(newarr);
+    vec->arr = newarr;
+  }
+  vec->arr[vec->size++] = v;
 }
