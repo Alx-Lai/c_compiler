@@ -14,13 +14,13 @@ enum TokenType {
 
 enum {
   /* for those need two characters */
-  PUNCTUATION_logical_and = 'a',   // &&
-  PUNCTUATION_logical_or = 'b',    // ||
-  PUNCTUATION_equal = 'c',         // ==
-  PUNCTUATION_not_equal = 'd',     // !=
-  PUNCTUATION_less_equal = 'e',    // <=
-  PUNCTUATION_greater_equal = 'f', // >=
-  PUNCTUATION_bitwise_shift_left = 'g', // <<
+  PUNCTUATION_logical_and = 'a',         // &&
+  PUNCTUATION_logical_or = 'b',          // ||
+  PUNCTUATION_equal = 'c',               // ==
+  PUNCTUATION_not_equal = 'd',           // !=
+  PUNCTUATION_less_equal = 'e',          // <=
+  PUNCTUATION_greater_equal = 'f',       // >=
+  PUNCTUATION_bitwise_shift_left = 'g',  // <<
   PUNCTUATION_bitwise_shift_right = 'h', // >>
 };
 
@@ -31,6 +31,14 @@ typedef struct Token {
   uintptr_t data;
 } Token;
 
+typedef struct {
+  size_t size, capacity;
+  Token *arr;
+} TokenVector;
+/* util.c */
+extern TokenVector *init_token_vector();
+extern void push_back_token(TokenVector *, Token);
+
 enum KeywordType {
   KEYWORD_return,
   KEYWORD_int,
@@ -38,12 +46,11 @@ enum KeywordType {
 };
 
 /* parser */
-typedef struct Variable{
+typedef struct Variable {
   enum KeywordType type;
   char *name;
   uintptr_t data;
 } Variable;
-
 
 enum ASTType {
   AST_literal,
@@ -74,11 +81,11 @@ typedef struct AST {
     };
 
     /* declare variable */
-    struct{
+    struct {
       char *decl_name;
       struct AST *decl_init;
     };
-    
+
     /* variable */
     struct {
       char *var_name;
@@ -89,7 +96,6 @@ typedef struct AST {
       char *assign_var_name;
       struct AST *assign_ast;
     };
-    
 
     /* Unary operator */
     struct {

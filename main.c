@@ -1,4 +1,3 @@
-#include "util.h"
 #include "typing.h"
 #include <assert.h>
 #include <ctype.h>
@@ -22,7 +21,6 @@ AST *lines[MAX_LINE];
 int line_count = 0;
 Variable variables[MAX_VAR];
 int var_count = 0;
-
 
 Token init_token(enum TokenType type, uintptr_t data) {
   return (Token){
@@ -88,16 +86,17 @@ void fail(int line_number) {
   assert(0);
 }
 
-uintptr_t get_variable(char *name){
-  for(int i=0;i<var_count;i++){
-    if(!strcmp(name, variables[i].name)) return variables[i].data;
+uintptr_t get_variable(char *name) {
+  for (int i = 0; i < var_count; i++) {
+    if (!strcmp(name, variables[i].name))
+      return variables[i].data;
   }
   return (uintptr_t)NULL;
 }
 
-void set_variable(char *name, uintptr_t data){
-  for(int i=0;i<var_count;i++){
-    if(!strcmp(name, variables[i].name)){
+void set_variable(char *name, uintptr_t data) {
+  for (int i = 0; i < var_count; i++) {
+    if (!strcmp(name, variables[i].name)) {
       variables[i].data = data;
       return;
     }
@@ -192,9 +191,11 @@ void lex(TokenVector *tokens, char code[]) {
         code_counter++;
       } else if (code[code_counter] == code[code_counter + 1]) {
         if (code[code_counter] == '>')
-          push_back_token(tokens, init_punctuation(PUNCTUATION_bitwise_shift_right));
+          push_back_token(tokens,
+                          init_punctuation(PUNCTUATION_bitwise_shift_right));
         else if (code[code_counter] == '<')
-          push_back_token(tokens, init_punctuation(PUNCTUATION_bitwise_shift_left));
+          push_back_token(tokens,
+                          init_punctuation(PUNCTUATION_bitwise_shift_left));
         code_counter++;
       } else {
         push_back_token(tokens, init_punctuation(code[code_counter]));
@@ -296,19 +297,19 @@ AST *parse_unary_expression(TokenVector *tokens, int *counter) {
   } else if (tokens->arr[(*counter)].type == IDENTIFIER) {
     char *name = (char *)tokens->arr[(*counter)].data;
     (*counter)++;
-    if(is_punctuation(tokens->arr[(*counter)], '=')) {
+    if (is_punctuation(tokens->arr[(*counter)], '=')) {
       (*counter)++;
       *ret = (AST){
-        .ast_type = AST_assign,
-        .type = KEYWORD_int,
-        .assign_var_name = name,
-        .assign_ast = parse_expression(tokens, counter),
+          .ast_type = AST_assign,
+          .type = KEYWORD_int,
+          .assign_var_name = name,
+          .assign_ast = parse_expression(tokens, counter),
       };
     } else {
       *ret = (AST){
-        .ast_type = AST_variable,
-        .type = KEYWORD_int,
-        .var_name = name,
+          .ast_type = AST_variable,
+          .type = KEYWORD_int,
+          .var_name = name,
       };
     }
   } else {
@@ -404,7 +405,7 @@ AST *parse_statement(TokenVector *tokens, int *counter) {
     };
     assert(is_punctuation(tokens->arr[(*counter)++], ';'));
     return ret;
-  } else if(is_keyword(tokens->arr[(*counter)], KEYWORD_int)) {
+  } else if (is_keyword(tokens->arr[(*counter)], KEYWORD_int)) {
     /* declare + assignment (optional)*/
     (*counter)++;
     assert(tokens->arr[(*counter)].type == IDENTIFIER);
@@ -412,7 +413,7 @@ AST *parse_statement(TokenVector *tokens, int *counter) {
     (*counter)++;
     AST *init_exp = NULL;
 
-    if(!is_punctuation(tokens->arr[(*counter)], ';')){ // not end -> assign
+    if (!is_punctuation(tokens->arr[(*counter)], ';')) { // not end -> assign
       assert(is_punctuation(tokens->arr[(*counter)], '='));
       init_exp = parse_expression(tokens, counter);
     }
@@ -424,7 +425,7 @@ AST *parse_statement(TokenVector *tokens, int *counter) {
     };
     assert(is_punctuation(tokens->arr[(*counter)++], ';'));
     return ret;
-  } else if(tokens->arr[(*counter)].type == IDENTIFIER){
+  } else if (tokens->arr[(*counter)].type == IDENTIFIER) {
     /* assignment */
     ret = parse_unary_expression(tokens, counter);
     assert(is_punctuation(tokens->arr[(*counter)++], ';'));
@@ -452,7 +453,7 @@ AST *parse_function(TokenVector *tokens, int *counter) {
   assert(is_punctuation(tokens->arr[(*counter)++], '{'));
 
   int origin_line_count = line_count; // TODO: add vector
-  while(!is_punctuation(tokens->arr[(*counter)], '}')){
+  while (!is_punctuation(tokens->arr[(*counter)], '}')) {
     AST *body = parse_statement(tokens, counter);
     lines[line_count++] = body;
   }
@@ -483,7 +484,8 @@ void output_ast(AST *ast) {
             "%s:\n",
             ast->func_name, ast->func_name);
     strcat(output, buf);
-    for(int i=0; i<line_count; i++){ // only one function, no bug now TODO: change into ast vector
+    for (int i = 0; i < line_count;
+         i++) { // only one function, no bug now TODO: change into ast vector
       output_ast(ast->body[i]);
     }
   } else if (ast->ast_type == AST_return) {
@@ -675,7 +677,7 @@ void output_ast(AST *ast) {
       output_ast(ast->right);
       strcat(output, "xor %rcx, %rcx\n"
                      "mov %al, %cl\n"
-                     "pop %rax\n"       // don't care about overflow now
+                     "pop %rax\n" // don't care about overflow now
                      "shl %cl, %rax\n");
       break;
     case PUNCTUATION_bitwise_shift_right:
