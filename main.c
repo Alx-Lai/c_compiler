@@ -40,6 +40,23 @@ bool is_punctuation(Token token, char ch) {
   return token.type == PUNCTUATION && token.data == (uintptr_t)ch;
 }
 
+bool is_assignment(Token token){
+  char ch = (char)token.data;
+  return token.type == PUNCTUATION && (
+    ch == '=' ||
+    ch == PUNCTUATION_add_equal ||
+    ch == PUNCTUATION_sub_equal ||
+    ch == PUNCTUATION_div_equal ||
+    ch == PUNCTUATION_mul_equal ||
+    ch == PUNCTUATION_mod_equal ||
+    ch == PUNCTUATION_shift_left_equal ||
+    ch == PUNCTUATION_shift_right_equal ||
+    ch == PUNCTUATION_bitwise_and_equal ||
+    ch == PUNCTUATION_bitwise_or_equal ||
+    ch == PUNCTUATION_bitwise_xor_equal  
+  );
+}
+
 bool is_keyword(Token token, enum KeywordType type) {
   return token.type == KEYWORD && token.data == (uintptr_t)type;
 }
@@ -347,6 +364,7 @@ AST *parse_unary_expression(TokenVector *tokens) {
     assert(is_punctuation(next_token(tokens), ')'));
   } else if (peek_token(tokens).type == IDENTIFIER) {
     char *name = (char *)next_token(tokens).data;
+    /* haven't know if b = (a += 2) is correct */
     if (is_punctuation(peek_token(tokens), '=')) {
       next_token(tokens);
       *ret = (AST){
@@ -467,13 +485,70 @@ AST *parse_statement(TokenVector *tokens) {
   } else if (peek_token(tokens).type == IDENTIFIER) {
     /* assignment */
     char *name = (char *)next_token(tokens).data;
-    assert(is_punctuation(next_token(tokens), '='));
-    *ret = (AST){
+    assert(is_assignment(peek_token(tokens)));
+    char type = (char)next_token(tokens).data;
+    if(type == '='){
+      *ret = (AST){
         .type = KEYWORD_int,
         .ast_type = AST_assign,
         .assign_var_name = name,
-        .assign_ast = parse_unary_expression(tokens),
-    };
+        .assign_ast = parse_expression(tokens),
+      };
+    } else {
+      AST *rvalue = (AST *)malloc(sizeof(AST)), *var = (AST *)malloc(sizeof(AST));
+      *var = (AST){
+        .ast_type = AST_variable,
+        .var_name = name,
+      };
+      char type2;
+      switch (type){
+      case PUNCTUATION_add_equal:
+        type2 = '+';
+        break;
+      case PUNCTUATION_sub_equal:
+        type2 = '-';
+        break;
+      case PUNCTUATION_div_equal:
+        type2 = '/';
+        break;
+      case PUNCTUATION_mul_equal:
+        type2 = '*';
+        break;
+      case PUNCTUATION_mod_equal:
+        type2 = '%';
+        break;
+      case PUNCTUATION_shift_left_equal:
+        type2 = PUNCTUATION_bitwise_shift_left;
+        break;
+      case PUNCTUATION_shift_right_equal:
+        type2 = PUNCTUATION_bitwise_shift_right;
+        break;
+      case PUNCTUATION_bitwise_and_equal:
+        type2 = '&';
+        break;
+      case PUNCTUATION_bitwise_or_equal:
+        type2 = '|';
+        break;
+      case PUNCTUATION_bitwise_xor_equal:
+        type2 = '^';
+        break;
+      default:
+        fail(__LINE__);
+        break;
+      }
+      *rvalue = (AST){
+        .ast_type = AST_binary_op,
+        .type = type2,
+        .left = var,
+        .right = parse_expression(tokens),
+      };
+      *ret = (AST){
+          .type = KEYWORD_int,
+          .ast_type = AST_assign,
+          .assign_var_name = name,
+          .assign_ast = rvalue,
+      };
+    }
     assert(is_punctuation(next_token(tokens), ';'));
     return ret;
   } else {
@@ -702,7 +777,7 @@ void output_ast(AST *ast) {
            "pop %%rbx\n"
            "pop %%rax\n" // don't care about overflow now
            "idiv %%rbx\n"
-           "mov %%rdx, %%rax");
+           "mov %%rdx, %%rax\n");
       break;
     case '&':
       output_ast(ast->left);
