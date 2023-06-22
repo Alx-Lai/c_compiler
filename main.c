@@ -1,4 +1,5 @@
 #include "typing.h"
+#include "util.h"
 #include <assert.h>
 #include <ctype.h>
 #include <fcntl.h>
@@ -364,15 +365,37 @@ AST *parse_unary_expression(TokenVector *tokens) {
     assert(is_punctuation(next_token(tokens), ')'));
   } else if (peek_token(tokens).type == IDENTIFIER) {
     char *name = (char *)next_token(tokens).data;
-    /* haven't know if b = (a += 2) is correct */
-    if (is_punctuation(peek_token(tokens), '=')) {
-      next_token(tokens);
-      *ret = (AST){
+    if (is_assignment(peek_token(tokens))) {
+      if (is_punctuation(peek_token(tokens), '=')) {
+        next_token(tokens);
+        *ret = (AST){
+            .ast_type = AST_assign,
+            .type = KEYWORD_int,
+            .assign_var_name = name,
+            .assign_ast = parse_expression(tokens),
+        };
+      } else {
+        /* b = (a += 2) => b = (a = a + 2) */
+        char type = (char)next_token(tokens).data;
+        type = assign_to_origin(type);
+        AST *sub_ast = (AST *)malloc(sizeof(AST)), *var = (AST *)malloc(sizeof(AST));
+        *var = (AST){
+          .ast_type = AST_variable,
+          .var_name = name,
+        };
+        *sub_ast = (AST){
+          .ast_type = AST_binary_op,
+          .type = type,
+          .left = var,
+          .right = parse_expression(tokens),
+        };
+        *ret = (AST){
           .ast_type = AST_assign,
           .type = KEYWORD_int,
           .assign_var_name = name,
-          .assign_ast = parse_expression(tokens),
-      };
+          .assign_ast = sub_ast,
+        };
+      }
     } else {
       *ret = (AST){
           .ast_type = AST_variable,
@@ -500,42 +523,7 @@ AST *parse_statement(TokenVector *tokens) {
         .ast_type = AST_variable,
         .var_name = name,
       };
-      char type2;
-      switch (type){
-      case PUNCTUATION_add_equal:
-        type2 = '+';
-        break;
-      case PUNCTUATION_sub_equal:
-        type2 = '-';
-        break;
-      case PUNCTUATION_div_equal:
-        type2 = '/';
-        break;
-      case PUNCTUATION_mul_equal:
-        type2 = '*';
-        break;
-      case PUNCTUATION_mod_equal:
-        type2 = '%';
-        break;
-      case PUNCTUATION_shift_left_equal:
-        type2 = PUNCTUATION_bitwise_shift_left;
-        break;
-      case PUNCTUATION_shift_right_equal:
-        type2 = PUNCTUATION_bitwise_shift_right;
-        break;
-      case PUNCTUATION_bitwise_and_equal:
-        type2 = '&';
-        break;
-      case PUNCTUATION_bitwise_or_equal:
-        type2 = '|';
-        break;
-      case PUNCTUATION_bitwise_xor_equal:
-        type2 = '^';
-        break;
-      default:
-        fail(__LINE__);
-        break;
-      }
+      char type2 = assign_to_origin(type);
       *rvalue = (AST){
         .ast_type = AST_binary_op,
         .type = type2,

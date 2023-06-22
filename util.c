@@ -1,4 +1,5 @@
 #include "typing.h"
+#include "util.h"
 #include <assert.h>
 #include <stdlib.h>
 
@@ -78,4 +79,32 @@ void push_back_variable(VariableVector *vec, Variable v){
     vec->arr = newarr;
   }
   vec->arr[vec->size++] = v;
+}
+
+extern char assign_to_origin(char ch){
+  switch (ch){
+  case PUNCTUATION_add_equal:
+    return '+';
+  case PUNCTUATION_sub_equal:
+    return '-';
+  case PUNCTUATION_div_equal:
+    return '/';
+  case PUNCTUATION_mul_equal:
+    return '*';
+  case PUNCTUATION_mod_equal:
+    return '%';
+  case PUNCTUATION_shift_left_equal:
+    return PUNCTUATION_bitwise_shift_left;
+  case PUNCTUATION_shift_right_equal:
+    return PUNCTUATION_bitwise_shift_right;
+  case PUNCTUATION_bitwise_and_equal:
+    return '&';
+  case PUNCTUATION_bitwise_or_equal:
+    return '|';
+  case PUNCTUATION_bitwise_xor_equal:
+    return '^';
+  default:
+    break;
+  }
+  return -1;
 }
