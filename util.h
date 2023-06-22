@@ -1,5 +1,6 @@
-#include "typing.h"
 #include <stdbool.h>
+
+#include "typing.h"
 
 /* += to + */
 char assign_to_origin(char);
@@ -13,3 +14,6 @@ bool is_keyword(Token, enum KeywordType);
 int get_label_counter();
 bool is_binary_op(Token);
 void fail(int);
+bool is_binary_op(Token);
+int get_precedence(Token);
+enum KeywordType parse_keyword(char *);
