@@ -51,25 +51,37 @@ int get_label_counter() {
 
 bool is_binary_op(Token token) {
   char type = (char)token.data;
-  static char binary_op_set[] = {'+',
-                                 '-',
-                                 '*',
-                                 '/',
-                                 PUNCTUATION_logical_and,
-                                 PUNCTUATION_logical_or,
-                                 PUNCTUATION_equal,
-                                 PUNCTUATION_not_equal,
-                                 '<',
-                                 PUNCTUATION_less_equal,
-                                 '>',
-                                 PUNCTUATION_greater_equal,
-                                 '%',
-                                 '&',
-                                 '|',
-                                 '^',
-                                 PUNCTUATION_bitwise_shift_left,
-                                 PUNCTUATION_bitwise_shift_right};
-  int len = 18;
+  static char binary_op_set[] = {
+      '+',
+      '-',
+      '*',
+      '/',
+      PUNCTUATION_logical_and,
+      PUNCTUATION_logical_or,
+      PUNCTUATION_equal,
+      PUNCTUATION_not_equal,
+      '<',
+      PUNCTUATION_less_equal,
+      '>',
+      PUNCTUATION_greater_equal,
+      '%',
+      '&',
+      '|',
+      '^',
+      PUNCTUATION_bitwise_shift_left,
+      PUNCTUATION_bitwise_shift_right,
+      PUNCTUATION_add_equal,
+      PUNCTUATION_sub_equal,
+      PUNCTUATION_div_equal,
+      PUNCTUATION_mul_equal,
+      PUNCTUATION_mod_equal,
+      PUNCTUATION_shift_left_equal,
+      PUNCTUATION_shift_right_equal,
+      PUNCTUATION_bitwise_and_equal,
+      PUNCTUATION_bitwise_or_equal,
+      PUNCTUATION_bitwise_xor_equal,
+  };
+  int len = 28;
   for (int i = 0; i < len; i++)
     if (type == binary_op_set[i])
       return true;
@@ -132,6 +144,16 @@ int get_precedence(Token token) {
   case PUNCTUATION_logical_or:
     return 12;
   case '=':
+  case PUNCTUATION_add_equal:
+  case PUNCTUATION_sub_equal:
+  case PUNCTUATION_div_equal:
+  case PUNCTUATION_mul_equal:
+  case PUNCTUATION_mod_equal:
+  case PUNCTUATION_shift_left_equal:
+  case PUNCTUATION_shift_right_equal:
+  case PUNCTUATION_bitwise_and_equal:
+  case PUNCTUATION_bitwise_or_equal:
+  case PUNCTUATION_bitwise_xor_equal:
     return 14;
   default:
     return 0;
@@ -147,15 +169,35 @@ void lex(TokenVector *tokens, char code[]) {
     case '(':
     case ')':
     case ';':
+    case '~':
+      push_back_token(tokens, init_punctuation(code[code_counter]));
+      code_counter++;
+      break;
     case '+':
     case '-':
     case '*':
     case '/':
     case '%':
-    case '~':
     case '^':
-      push_back_token(tokens, init_punctuation(code[code_counter]));
-      code_counter++;
+      if (code[code_counter + 1] == '=') {
+        if (code[code_counter] == '+')
+          push_back_token(tokens, init_punctuation(PUNCTUATION_add_equal));
+        else if (code[code_counter] == '-')
+          push_back_token(tokens, init_punctuation(PUNCTUATION_sub_equal));
+        else if (code[code_counter] == '*')
+          push_back_token(tokens, init_punctuation(PUNCTUATION_mul_equal));
+        else if (code[code_counter] == '/')
+          push_back_token(tokens, init_punctuation(PUNCTUATION_div_equal));
+        else if (code[code_counter] == '%')
+          push_back_token(tokens, init_punctuation(PUNCTUATION_mod_equal));
+        else if (code[code_counter] == '^')
+          push_back_token(tokens,
+                          init_punctuation(PUNCTUATION_bitwise_xor_equal));
+        code_counter += 2;
+      } else {
+        push_back_token(tokens, init_punctuation(code[code_counter]));
+        code_counter++;
+      }
       break;
     case '!':
       if (code[code_counter + 1] == '=') {
@@ -168,24 +210,40 @@ void lex(TokenVector *tokens, char code[]) {
       break;
     case '>':
     case '<':
-      if (code[code_counter + 1] == '=') {
-        if (code[code_counter] == '>')
-          push_back_token(tokens, init_punctuation(PUNCTUATION_greater_equal));
-        else if (code[code_counter] == '<')
-          push_back_token(tokens, init_punctuation(PUNCTUATION_less_equal));
-        code_counter++;
+      if (code[code_counter] == code[code_counter + 1] &&
+          code[code_counter + 2] == '=') {
+        /* >>= <<= */
+        if (code[code_counter] == '>') {
+          push_back_token(tokens,
+                          init_punctuation(PUNCTUATION_shift_right_equal));
+        } else if (code[code_counter] == '<') {
+          push_back_token(tokens,
+                          init_punctuation(PUNCTUATION_shift_left_equal));
+        }
+        code_counter += 3;
       } else if (code[code_counter] == code[code_counter + 1]) {
-        if (code[code_counter] == '>')
+        /* >> << */
+        if (code[code_counter] == '>') {
           push_back_token(tokens,
                           init_punctuation(PUNCTUATION_bitwise_shift_right));
-        else if (code[code_counter] == '<')
+        } else if (code[code_counter] == '<') {
           push_back_token(tokens,
                           init_punctuation(PUNCTUATION_bitwise_shift_left));
-        code_counter++;
+        }
+        code_counter += 2;
+      } else if (code[code_counter + 1] == '=') {
+        /* >= <= */
+        if (code[code_counter] == '>') {
+          push_back_token(tokens, init_punctuation(PUNCTUATION_greater_equal));
+        } else if (code[code_counter] == '<') {
+          push_back_token(tokens, init_punctuation(PUNCTUATION_less_equal));
+        }
+        code_counter += 2;
       } else {
+        /* > < */
         push_back_token(tokens, init_punctuation(code[code_counter]));
+        code_counter++;
       }
-      code_counter++;
       break;
     case '=':
     case '&':
@@ -197,11 +255,21 @@ void lex(TokenVector *tokens, char code[]) {
           push_back_token(tokens, init_punctuation(PUNCTUATION_logical_or));
         else if (code[code_counter] == '=')
           push_back_token(tokens, init_punctuation(PUNCTUATION_equal));
-        code_counter++;
+        code_counter += 2;
+      } else if (code[code_counter + 1] == '=') {
+        /* &= |= */
+        if (code[code_counter] == '&') {
+          push_back_token(tokens,
+                          init_punctuation(PUNCTUATION_bitwise_and_equal));
+        } else if (code[code_counter] == '|') {
+          push_back_token(tokens,
+                          init_punctuation(PUNCTUATION_bitwise_or_equal));
+        }
+        code_counter += 2;
       } else {
         push_back_token(tokens, init_punctuation(code[code_counter]));
+        code_counter++;
       }
-      code_counter++;
       break;
     case '\n':
     case ' ':

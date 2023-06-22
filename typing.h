@@ -22,6 +22,16 @@ enum {
   PUNCTUATION_greater_equal = 'f', // >=
   PUNCTUATION_bitwise_shift_left = 'g', // <<
   PUNCTUATION_bitwise_shift_right = 'h', // >>
+  PUNCTUATION_add_equal = 'i', // +=
+  PUNCTUATION_sub_equal = 'j', // -=
+  PUNCTUATION_div_equal = 'k', // /=
+  PUNCTUATION_mul_equal = 'l', // *=
+  PUNCTUATION_mod_equal = 'm', // %=
+  PUNCTUATION_shift_left_equal = 'n', // <<=
+  PUNCTUATION_shift_right_equal = 'o', // >>=
+  PUNCTUATION_bitwise_and_equal = 'p', // &=
+  PUNCTUATION_bitwise_or_equal = 'q', // |=
+  PUNCTUATION_bitwise_xor_equal = 'r', // ^=
 };
 
 typedef struct {
