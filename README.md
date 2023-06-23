@@ -13,7 +13,8 @@ make # compile with gcc
 - declare int variables
 - arithmetic expression and assignment
 - keyword return
-
+- support one statement if and ternary operation
+- **haven't** support `,`
 ### Example
 ```
 int main() {
