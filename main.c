@@ -194,6 +194,7 @@ AST *parse_expression(TokenVector *tokens);
 AST *parse_assignment_or_expression(TokenVector *tokens);
 
 AST *parse_unary_expression(TokenVector *tokens) {
+  errf("call parse_unary_expression id:%d\n", getpos_token());
   AST *ret = (AST *)malloc(sizeof(AST));
   /* unary*/
   if (is_punctuation(peek_token(tokens), '-') ||
@@ -225,12 +226,15 @@ AST *parse_unary_expression(TokenVector *tokens) {
         .var_name = name,
     };
   } else {
+    errf("type:%d %c id:%d\n", peek_token(tokens).type,
+         (char)peek_token(tokens).data, getpos_token());
     fail(__LINE__);
   }
   return ret;
 }
 
 AST *parse_expression(TokenVector *tokens) {
+  errf("call parse_expression id:%d\n", getpos_token());
   AST *left = parse_unary_expression(tokens), *right;
   if (is_binary_op(peek_token(tokens))) {
     /* binary op */
@@ -295,7 +299,29 @@ AST *parse_expression(TokenVector *tokens) {
   }
 }
 
+AST *parse_conditional_expression(TokenVector *tokens) {
+  AST *condition = parse_expression(tokens);
+  if (is_punctuation(peek_token(tokens), '?')) {
+    /* ternary operator */
+    next_token(tokens);
+    AST *if_body = parse_assignment_or_expression(tokens);
+    assert(is_punctuation(next_token(tokens), ':'));
+    AST *else_body = parse_conditional_expression(tokens);
+    AST *ret = (AST *)malloc(sizeof(AST));
+    *ret = (AST){
+        .ast_type = AST_ternary,
+        .condition = condition,
+        .if_body = if_body,
+        .else_body = else_body,
+    };
+    return ret;
+  } else {
+    return condition;
+  }
+}
+
 AST *parse_assignment_or_expression(TokenVector *tokens) {
+  errf("call parse_assignment_or_expression id:%d\n", getpos_token());
   AST *ret = (AST *)malloc(sizeof(AST));
   bool assignment = false;
   if (peek_token(tokens).type == IDENTIFIER) {
@@ -340,26 +366,60 @@ AST *parse_assignment_or_expression(TokenVector *tokens) {
     }
   } else {
     /* expression \ {assignment} */
-    ret = parse_expression(tokens);
+    ret = parse_conditional_expression(tokens);
   }
   return ret;
 }
 
 AST *parse_statement(TokenVector *tokens) {
+  errf("call parse_statement id:%d\n", getpos_token());
   AST *ret = (AST *)malloc(sizeof(AST));  // TODO: prevent memory leak
   if (is_keyword(peek_token(tokens), KEYWORD_return)) {
     /* return value */
     next_token(tokens);
     *ret = (AST){
         .ast_type = AST_return,
-        .return_value = parse_expression(tokens),
+        .return_value = parse_assignment_or_expression(tokens),
     };
-  } else if (is_keyword(peek_token(tokens), KEYWORD_int)) {
-    /* declare and assignment (optional)*/
+    assert(is_punctuation(next_token(tokens), ';'));
+  } else if (is_keyword(peek_token(tokens), KEYWORD_if)) {
+    /* if */
+    next_token(tokens);
+    assert(is_punctuation(next_token(tokens), '('));  // (
+    AST *condition = parse_assignment_or_expression(tokens);
+    assert(is_punctuation(next_token(tokens), ')'));  // )
+    /* now only one statement */
+    AST *if_body = parse_statement(tokens);
+    AST *else_body = NULL;
+    if (is_keyword(peek_token(tokens), KEYWORD_else)) {
+      /* else */
+      next_token(tokens);
+      else_body = parse_statement(tokens);
+    }
+    *ret = (AST){
+        .ast_type = AST_if,
+        .condition = condition,
+        .if_body = if_body,
+        .else_body = else_body,
+    };
+  } else {
+    /* expression */
+    ret = parse_assignment_or_expression(tokens);
+    assert(is_punctuation(next_token(tokens), ';'));
+  }
+  return ret;
+}
+
+AST *parse_statement_or_declaration(TokenVector *tokens) {
+  errf("call parse_statement_or_declaration id:%d\n", getpos_token());
+  AST *ret;
+  if (is_keyword(peek_token(tokens), KEYWORD_int)) {
+    /* declare [ and assignment ] */
     next_token(tokens);
     assert(peek_token(tokens).type == IDENTIFIER);
     char *name = (char *)next_token(tokens).data;
     AST *init_exp = NULL;
+    ret = (AST *)malloc(sizeof(AST));
 
     if (!is_punctuation(peek_token(tokens), ';')) {
       // haven't end -> assignment
@@ -372,11 +432,11 @@ AST *parse_statement(TokenVector *tokens) {
         .decl_name = name,
         .decl_init = init_exp,
     };
+    assert(is_punctuation(next_token(tokens), ';'));
   } else {
-    /* expression */
-    ret = parse_assignment_or_expression(tokens);
+    /* statement */
+    ret = parse_statement(tokens);
   }
-  assert(is_punctuation(next_token(tokens), ';'));
   return ret;
 }
 
@@ -399,7 +459,7 @@ AST *parse_function(TokenVector *tokens) {
 
   ASTVector *body = init_AST_vector();
   while (!is_punctuation(peek_token(tokens), '}')) {
-    AST *statement = parse_statement(tokens);
+    AST *statement = parse_statement_or_declaration(tokens);
     push_back_AST(body, statement);
   }
 
@@ -707,9 +767,8 @@ void print_ast(AST *ast) {
       printf("int %s() {\n", ast->func_name);
       for (int i = 0; i < ast->body->size; i++) {
         print_ast(ast->body->arr[i]);
-        printf(";\n");
+        if (ast->body->arr[i]->ast_type != AST_if) printf(";\n");
       }
-      printf("}\n");
       break;
     case AST_declare:
       assert(ast->type == KEYWORD_int);
@@ -768,6 +827,29 @@ void print_ast(AST *ast) {
     case AST_variable:
       printf("%s", ast->var_name);
       break;
+    case AST_if:
+      printf("if (");
+      print_ast(ast->condition);
+      printf(") {\n");
+      print_ast(ast->if_body);
+      if (ast->if_body->ast_type != AST_if) printf(";\n");
+      printf("}");
+      if (ast->else_body) {
+        printf(" else {\n");
+        print_ast(ast->else_body);
+        if (ast->else_body->ast_type != AST_if) printf(";\n");
+        printf("}\n");
+      } else {
+        printf("\n");
+      }
+      break;
+    case AST_ternary:
+      print_ast(ast->condition);
+      printf(" ? ");
+      print_ast(ast->if_body);
+      printf(" : ");
+      print_ast(ast->else_body);
+      break;
     default:
       fail(__LINE__);
       break;
@@ -792,8 +874,8 @@ int main(int argc, char *argv[]) {
   lex(tokens, code);
   print_lex(tokens);
 
-  // AST *ast = parse_ast(tokens);
-  // print_ast(ast);
+  AST *ast = parse_ast(tokens);
+  print_ast(ast);
 
   // output_program(ast);
 }

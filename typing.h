@@ -72,6 +72,8 @@ enum ASTType {
   AST_binary_op,
   AST_assign,
   AST_variable,
+  AST_if,
+  AST_ternary,
 };
 
 struct AST;
@@ -79,7 +81,6 @@ typedef struct {
   size_t size, capacity;
   struct AST **arr;
 } ASTVector;
-
 
 typedef struct AST {
   int ast_type;
@@ -123,6 +124,11 @@ typedef struct AST {
     /* Binary operator */
     struct {
       struct AST *left, *right;
+    };
+
+    /* if statement or ternary expression distinguish with ast_type */
+    struct {
+      struct AST *condition, *if_body, *else_body;
     };
   };
 } AST;
