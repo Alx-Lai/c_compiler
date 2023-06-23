@@ -45,22 +45,12 @@ typedef struct {
   size_t size, capacity;
   Token *arr;
 } TokenVector;
-/* util.c */
-extern TokenVector *init_token_vector();
-extern void push_back_token(TokenVector *, Token);
 
 enum KeywordType {
   KEYWORD_return,
   KEYWORD_int,
   KEYWORD_unknown,
 };
-
-/* parser */
-extern void seek_token(int);
-extern Token peek_token(TokenVector *);
-extern Token next_token(TokenVector *);
-extern void back_token();
-extern int getpos_token();
 typedef struct Variable {
   char *name;
   int offset;  // offset on stack
@@ -70,8 +60,6 @@ typedef struct {
   size_t size, capacity;
   Variable *arr;
 } VariableVector;
-extern VariableVector *init_variable_vector();
-extern void push_back_variable(VariableVector *, Variable);
 
 enum ASTType {
   AST_literal,
@@ -89,9 +77,7 @@ typedef struct {
   size_t size, capacity;
   struct AST **arr;
 } ASTVector;
-/* util.c */
-extern ASTVector *init_AST_vector();
-extern void push_back_AST(ASTVector *, struct AST *);
+
 
 typedef struct AST {
   int ast_type;

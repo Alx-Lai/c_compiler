@@ -2,8 +2,26 @@
 
 #include "typing.h"
 
-/* += to + */
-char assign_to_origin(char);
+/* vector tools */
+TokenVector *init_token_vector();
+void push_back_token(TokenVector *, Token);
+
+VariableVector *init_variable_vector();
+void push_back_variable(VariableVector *, Variable);
+
+ASTVector *init_AST_vector();
+void push_back_AST(ASTVector *, struct AST *);
+
+
+/* parser */
+void seek_token(int);
+Token peek_token(TokenVector *);
+Token next_token(TokenVector *);
+void back_token();
+int getpos_token();
+
+/* util */
+char assign_to_origin(char); // += to +
 Token init_token(enum TokenType, uintptr_t);
 Token init_punctuation(char);
 Token init_keyword(enum KeywordType);
@@ -14,6 +32,5 @@ bool is_keyword(Token, enum KeywordType);
 int get_label_counter();
 bool is_binary_op(Token);
 void fail(int);
-bool is_binary_op(Token);
 int get_precedence(Token);
 enum KeywordType parse_keyword(char *);
