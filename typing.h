@@ -59,6 +59,7 @@ enum KeywordType {
 extern void seek_token(int);
 extern Token peek_token(TokenVector *);
 extern Token next_token(TokenVector *);
+extern void back_token();
 extern int getpos_token();
 typedef struct Variable {
   char *name;

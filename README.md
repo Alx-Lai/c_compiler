@@ -20,13 +20,12 @@ int main() {
   int b = 1;
   a += 2;
   a = a + b;
+  a || (a = 2) || (b = 4);
   return a;
 }
 ```
 
 ## Known Bugs
-- [Work in Process] `!a = 2;` should have error in parsing stage, but is parsed into `!(a = 2);`, which is valid.
-- [Work in Process] `a || (a = 2) || (a = 4);` is a valid statement, but may cause parsing error.
 
 
 

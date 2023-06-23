@@ -18,6 +18,7 @@ char code[MAX_CODE];
 char buf[BUF_SIZE];
 VariableVector *variables;
 FILE *output_f;
+#define errf(...) fprintf(stderr, __VA_ARGS__)
 
 int get_variable_offset(char *name) {
   for (int i = 0; i < variables->size; i++) {
@@ -187,8 +188,10 @@ void print_lex(TokenVector *tokens) {
   }
 }
 AST *parse_expression(TokenVector *tokens);
+AST *parse_assignment_or_expression(TokenVector *tokens);
 
 AST *parse_unary_expression(TokenVector *tokens) {
+  errf("call parse_unary_expression\n");
   AST *ret = (AST *)malloc(sizeof(AST));
   /* unary*/
   if (is_punctuation(peek_token(tokens), '-') ||
@@ -210,60 +213,29 @@ AST *parse_unary_expression(TokenVector *tokens) {
   } else if (is_punctuation(peek_token(tokens), '(')) {
     free(ret);
     next_token(tokens);
-    ret = parse_expression(tokens);
+    ret = parse_assignment_or_expression(tokens);
     assert(is_punctuation(next_token(tokens), ')'));
   } else if (peek_token(tokens).type == IDENTIFIER) {
+    /* pure id e.g. ""a"" || (a = 2) */
     char *name = (char *)next_token(tokens).data;
-    if (is_assignment(peek_token(tokens))) {
-      if (is_punctuation(peek_token(tokens), '=')) {
-        next_token(tokens);
-        *ret = (AST){
-            .ast_type = AST_assign,
-            .type = KEYWORD_int,
-            .assign_var_name = name,
-            .assign_ast = parse_expression(tokens),
-        };
-      } else {
-        /* b = (a += 2) => b = (a = a + 2) */
-        char type = (char)next_token(tokens).data;
-        type = assign_to_origin(type);
-        AST *sub_ast = (AST *)malloc(sizeof(AST)),
-            *var = (AST *)malloc(sizeof(AST));
-        *var = (AST){
-            .ast_type = AST_variable,
-            .var_name = name,
-        };
-        *sub_ast = (AST){
-            .ast_type = AST_binary_op,
-            .type = type,
-            .left = var,
-            .right = parse_expression(tokens),
-        };
-        *ret = (AST){
-            .ast_type = AST_assign,
-            .type = KEYWORD_int,
-            .assign_var_name = name,
-            .assign_ast = sub_ast,
-        };
-      }
-    } else {
-      *ret = (AST){
-          .ast_type = AST_variable,
-          .type = KEYWORD_int,
-          .var_name = name,
-      };
-    }
+    *ret = (AST){
+        .ast_type = AST_variable,
+        .var_name = name,
+    };
   } else {
+    errf("type:%d %c\n", peek_token(tokens).type,
+         (char)peek_token(tokens).data);
     fail(__LINE__);
   }
   return ret;
 }
 
 AST *parse_expression(TokenVector *tokens) {
+  errf("call parse_expression\n");
   AST *left = parse_unary_expression(tokens), *right;
-  /* binary op */
-  /* binary parse from left to right  */
   if (is_binary_op(peek_token(tokens))) {
+    /* binary op */
+    /* binary parse from left to right  */
     int pred_front = get_precedence(peek_token(tokens));
     char type = (char)next_token(tokens).data;
     right = parse_unary_expression(tokens);
@@ -324,50 +296,32 @@ AST *parse_expression(TokenVector *tokens) {
   }
 }
 
-AST *parse_statement(TokenVector *tokens) {
-  AST *ret = (AST *)malloc(sizeof(AST));  // TODO: prevent memory leak
-  if (is_keyword(peek_token(tokens), KEYWORD_return)) {
-    /* return value */
+AST *parse_assignment_or_expression(TokenVector *tokens) {
+  errf("call parse_assignment_or_expression\n");
+  AST *ret = (AST *)malloc(sizeof(AST));
+  bool assignment = false;
+  if (peek_token(tokens).type == IDENTIFIER) {
     next_token(tokens);
-    *ret = (AST){
-        .ast_type = AST_return,
-        .return_value = parse_expression(tokens),
-    };
-    assert(is_punctuation(next_token(tokens), ';'));
-    return ret;
-  } else if (is_keyword(peek_token(tokens), KEYWORD_int)) {
-    /* declare and assignment (optional)*/
-    next_token(tokens);
-    assert(peek_token(tokens).type == IDENTIFIER);
-    char *name = (char *)next_token(tokens).data;
-    AST *init_exp = NULL;
-
-    if (!is_punctuation(peek_token(tokens), ';')) {
-      // haven't end -> assignment
-      assert(is_punctuation(next_token(tokens), '='));
-      init_exp = parse_expression(tokens);
-    }
-    *ret = (AST){
-        .type = KEYWORD_int,
-        .ast_type = AST_declare,
-        .decl_name = name,
-        .decl_init = init_exp,
-    };
-    assert(is_punctuation(next_token(tokens), ';'));
-    return ret;
-  } else if (peek_token(tokens).type == IDENTIFIER) {
+    if (is_assignment(peek_token(tokens))) assignment = true;
+    back_token();
+  }
+  if (assignment) {
     /* assignment */
     char *name = (char *)next_token(tokens).data;
+    errf("%s %d %c\n", name, peek_token(tokens).type,
+         (char)peek_token(tokens).data);
     assert(is_assignment(peek_token(tokens)));
     char type = (char)next_token(tokens).data;
     if (type == '=') {
+      /* = */
       *ret = (AST){
           .type = KEYWORD_int,
           .ast_type = AST_assign,
           .assign_var_name = name,
-          .assign_ast = parse_expression(tokens),
+          .assign_ast = parse_assignment_or_expression(tokens),
       };
     } else {
+      /* += series */
       AST *rvalue = (AST *)malloc(sizeof(AST)),
           *var = (AST *)malloc(sizeof(AST));
       *var = (AST){
@@ -379,7 +333,7 @@ AST *parse_statement(TokenVector *tokens) {
           .ast_type = AST_binary_op,
           .type = type2,
           .left = var,
-          .right = parse_expression(tokens),
+          .right = parse_assignment_or_expression(tokens),
       };
       *ret = (AST){
           .type = KEYWORD_int,
@@ -388,15 +342,47 @@ AST *parse_statement(TokenVector *tokens) {
           .assign_ast = rvalue,
       };
     }
-    assert(is_punctuation(next_token(tokens), ';'));
-    return ret;
   } else {
-    /* else = useless expression */
+    /* expression \ {assignment} */
     ret = parse_expression(tokens);
-    assert(is_punctuation(next_token(tokens), ';'));
-    return ret;
   }
-  return NULL;
+  return ret;
+}
+
+AST *parse_statement(TokenVector *tokens) {
+  errf("call parse_statement\n");
+  AST *ret = (AST *)malloc(sizeof(AST));  // TODO: prevent memory leak
+  if (is_keyword(peek_token(tokens), KEYWORD_return)) {
+    /* return value */
+    next_token(tokens);
+    *ret = (AST){
+        .ast_type = AST_return,
+        .return_value = parse_expression(tokens),
+    };
+  } else if (is_keyword(peek_token(tokens), KEYWORD_int)) {
+    /* declare and assignment (optional)*/
+    next_token(tokens);
+    assert(peek_token(tokens).type == IDENTIFIER);
+    char *name = (char *)next_token(tokens).data;
+    AST *init_exp = NULL;
+
+    if (!is_punctuation(peek_token(tokens), ';')) {
+      // haven't end -> assignment
+      assert(is_punctuation(next_token(tokens), '='));
+      init_exp = parse_assignment_or_expression(tokens);
+    }
+    *ret = (AST){
+        .type = KEYWORD_int,
+        .ast_type = AST_declare,
+        .decl_name = name,
+        .decl_init = init_exp,
+    };
+  } else {
+    /* expression */
+    ret = parse_assignment_or_expression(tokens);
+  }
+  assert(is_punctuation(next_token(tokens), ';'));
+  return ret;
 }
 
 AST *parse_function(TokenVector *tokens) {
@@ -405,7 +391,7 @@ AST *parse_function(TokenVector *tokens) {
   assert(is_keyword(peek_token(tokens), KEYWORD_int));
   int return_type = (enum KeywordType)next_token(tokens).data;
 
-  /* main */
+  /* function name */
   assert(peek_token(tokens).type == IDENTIFIER);
   char *name = (char *)next_token(tokens).data;
 
