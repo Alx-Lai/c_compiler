@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-TokenVector *init_token_vector() {  // TODO: move to util.c
+TokenVector *init_token_vector() {
   TokenVector *ret = (TokenVector *)malloc(sizeof(TokenVector));
   Token *arr = (Token *)malloc(2 * sizeof(Token));
   *ret = (TokenVector){
@@ -32,7 +32,7 @@ Token next_token(TokenVector *vec) { return vec->arr[token_pointer++]; }
 void back_token() { --token_pointer; }
 int getpos_token() { return token_pointer; }
 
-ASTVector *init_AST_vector() {  // TODO: move to util.c
+ASTVector *init_AST_vector() {
   ASTVector *ret = (ASTVector *)malloc(sizeof(ASTVector));
   AST **arr = (AST **)malloc(2 * sizeof(AST *));
   *ret = (ASTVector){

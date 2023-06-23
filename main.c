@@ -28,6 +28,7 @@ int get_variable_offset(char *name) {
 }
 
 void lex(TokenVector *tokens, char code[]) {
+  /* TODO: code + code_counter to a vector */
   int code_counter = 0, word_counter = 0;
   while (code[code_counter]) {
     switch (code[code_counter]) {
@@ -149,7 +150,7 @@ void lex(TokenVector *tokens, char code[]) {
         word_counter = 0;
         if (isalpha(code[code_counter])) {
           do {
-            buf[word_counter++] = code[code_counter++];  // todo: vector
+            buf[word_counter++] = code[code_counter++];
           } while (isalnum(code[code_counter]));
           buf[word_counter] = '\0';
           char *name = (char *)malloc((word_counter + 1) * sizeof(char));
@@ -430,6 +431,7 @@ AST *parse_ast(TokenVector *tokens) {
 #define outf(...) fprintf(output_f, __VA_ARGS__)
 
 void output_ast(AST *ast) {
+  /* TODO: refactor or clean or refactor the long code*/
   static int stack_offset;
   int offset;
   if (ast->ast_type == AST_function) {
@@ -504,7 +506,7 @@ void output_ast(AST *ast) {
         break;
       case '/':
         /* idiv rbx ; rax = rdx:rax / rbx, rdx = rdx:rax % rax  */
-        output_ast(ast->left);  // TODO: refactor
+        output_ast(ast->left);
         outf("push %%rax\n");
         output_ast(ast->right);
         outf(
@@ -611,7 +613,7 @@ void output_ast(AST *ast) {
         break;
       case '%':
         /* idiv rbx ; rax = rdx:rax / rbx, rdx = rdx:rax % rax  */
-        output_ast(ast->left);  // TODO: refactor
+        output_ast(ast->left);
         outf("push %%rax\n");
         output_ast(ast->right);
         outf(
@@ -647,7 +649,7 @@ void output_ast(AST *ast) {
             "xor %%rcx, %%rax\n");
         break;
       case PUNCTUATION_bitwise_shift_left:
-        output_ast(ast->left);  // TODO: refactor
+        output_ast(ast->left);
         outf("push %%rax\n");
         output_ast(ast->right);
         outf(
@@ -657,7 +659,7 @@ void output_ast(AST *ast) {
             "shl %%cl, %%rax\n");
         break;
       case PUNCTUATION_bitwise_shift_right:
-        output_ast(ast->left);  // TODO: refactor
+        output_ast(ast->left);
         outf("push %%rax\n");
         output_ast(ast->right);
         outf(
