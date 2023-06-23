@@ -49,6 +49,8 @@ typedef struct {
 enum KeywordType {
   KEYWORD_return,
   KEYWORD_int,
+  KEYWORD_if,
+  KEYWORD_else,
   KEYWORD_unknown,
 };
 typedef struct Variable {

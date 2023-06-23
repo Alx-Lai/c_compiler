@@ -1,18 +1,19 @@
 # Learning C compiler
-Learning to build a small c compiler with tutorial on https://norasandler.com/2017/11/29/Write-a-Compiler.html
+Learning to build a multi-pass C compiler with [tutorial](https://norasandler.com/2017/11/29/Write-a-Compiler.html), including lexer, parser, and generating x64 assembly code
 
 
 ## Usage
 
 ```
 make # compile with gcc
-./main <file>
+./main <file> # or ./run.sh <file> to check result
 ```
 
 ## Support syntax
 - declare int variables
 - arithmetic expression and assignment
 - keyword return
+
 ### Example
 ```
 int main() {
@@ -28,8 +29,8 @@ int main() {
 ## Known Bugs
 
 
-
 ## Reference
 https://norasandler.com/2017/11/29/Write-a-Compiler.html
 https://github.com/wbowling/rcc
 https://github.com/jserv/MazuCC
+https://en.cppreference.com/w/c/11

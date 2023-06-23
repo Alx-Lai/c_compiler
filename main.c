@@ -38,6 +38,8 @@ void lex(TokenVector *tokens, char code[]) {
       case ')':
       case ';':
       case '~':
+      case ':':
+      case '?':
         push_back_token(tokens, init_punctuation(code[code_counter]));
         code_counter++;
         break;
@@ -192,7 +194,6 @@ AST *parse_expression(TokenVector *tokens);
 AST *parse_assignment_or_expression(TokenVector *tokens);
 
 AST *parse_unary_expression(TokenVector *tokens) {
-  errf("call parse_unary_expression\n");
   AST *ret = (AST *)malloc(sizeof(AST));
   /* unary*/
   if (is_punctuation(peek_token(tokens), '-') ||
@@ -224,15 +225,12 @@ AST *parse_unary_expression(TokenVector *tokens) {
         .var_name = name,
     };
   } else {
-    errf("type:%d %c\n", peek_token(tokens).type,
-         (char)peek_token(tokens).data);
     fail(__LINE__);
   }
   return ret;
 }
 
 AST *parse_expression(TokenVector *tokens) {
-  errf("call parse_expression\n");
   AST *left = parse_unary_expression(tokens), *right;
   if (is_binary_op(peek_token(tokens))) {
     /* binary op */
@@ -298,7 +296,6 @@ AST *parse_expression(TokenVector *tokens) {
 }
 
 AST *parse_assignment_or_expression(TokenVector *tokens) {
-  errf("call parse_assignment_or_expression\n");
   AST *ret = (AST *)malloc(sizeof(AST));
   bool assignment = false;
   if (peek_token(tokens).type == IDENTIFIER) {
@@ -309,8 +306,6 @@ AST *parse_assignment_or_expression(TokenVector *tokens) {
   if (assignment) {
     /* assignment */
     char *name = (char *)next_token(tokens).data;
-    errf("%s %d %c\n", name, peek_token(tokens).type,
-         (char)peek_token(tokens).data);
     assert(is_assignment(peek_token(tokens)));
     char type = (char)next_token(tokens).data;
     if (type == '=') {
@@ -351,7 +346,6 @@ AST *parse_assignment_or_expression(TokenVector *tokens) {
 }
 
 AST *parse_statement(TokenVector *tokens) {
-  errf("call parse_statement\n");
   AST *ret = (AST *)malloc(sizeof(AST));  // TODO: prevent memory leak
   if (is_keyword(peek_token(tokens), KEYWORD_return)) {
     /* return value */
@@ -798,8 +792,8 @@ int main(int argc, char *argv[]) {
   lex(tokens, code);
   print_lex(tokens);
 
-  AST *ast = parse_ast(tokens);
-  print_ast(ast);
+  // AST *ast = parse_ast(tokens);
+  // print_ast(ast);
 
-  output_program(ast);
+  // output_program(ast);
 }
