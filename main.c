@@ -487,7 +487,7 @@ AST *parse_ast(TokenVector *tokens) {
 void output_ast(AST *ast) {
   /* TODO: refactor or clean or refactor the long code*/
   static int stack_offset;
-  int offset;
+  int offset, counter;
   if (ast->ast_type == AST_function) {
     outf(
         ".globl %s\n"
@@ -527,7 +527,6 @@ void output_ast(AST *ast) {
     }
   } else if (ast->ast_type == AST_binary_op) {
     // cannot push 32 bit reg in x64 machine
-    int counter;
     switch (ast->type) {
       case '+':
         output_ast(ast->left);
@@ -751,6 +750,35 @@ void output_ast(AST *ast) {
     offset = get_variable_offset(ast->var_name);
     assert(offset != -1);
     outf("mov %d(%%rbp), %%rax\n", offset);
+  } else if (ast->ast_type == AST_if) {
+    counter = get_label_counter();
+    output_ast(ast->condition);
+    outf(
+        "cmp $0, %%rax\n"
+        "je _else_%d\n",
+        counter);
+    output_ast(ast->if_body);
+    outf(
+        "jmp _post_conditional_%d\n"
+        "_else_%d:\n",
+        counter, counter);
+    /* no else -> no output */
+    if (ast->else_body) output_ast(ast->else_body);
+    outf("_post_conditional_%d:\n", counter);
+  } else if (ast->ast_type == AST_ternary) {
+    counter = get_label_counter();
+    output_ast(ast->condition);
+    outf(
+        "cmp $0, %%rax\n"
+        "je _exp3_%d\n",
+        counter);
+    output_ast(ast->if_body);
+    outf(
+        "jmp _post_ternary_%d\n"
+        "_exp3_%d:\n",
+        counter, counter);
+    output_ast(ast->else_body);
+    outf("_post_ternary_%d:\n", counter);
   } else {
     fprintf(stderr, "type:%d", ast->ast_type);
     fail(__LINE__);
@@ -767,8 +795,12 @@ void print_ast(AST *ast) {
       printf("int %s() {\n", ast->func_name);
       for (int i = 0; i < ast->body->size; i++) {
         print_ast(ast->body->arr[i]);
-        if (ast->body->arr[i]->ast_type != AST_if) printf(";\n");
+        if (ast->body->arr[i]->ast_type != AST_if)
+          printf(";\n");
+        else
+          printf("\n");
       }
+      printf("}\n");
       break;
     case AST_declare:
       assert(ast->type == KEYWORD_int);
@@ -870,12 +902,12 @@ int main(int argc, char *argv[]) {
 
   TokenVector *tokens = init_token_vector();
   variables = init_variable_vector();
-
+  /* lex */
   lex(tokens, code);
   print_lex(tokens);
-
+  /* parsing ast */
   AST *ast = parse_ast(tokens);
   print_ast(ast);
-
-  // output_program(ast);
+  /* output assembly */
+  output_program(ast);
 }
