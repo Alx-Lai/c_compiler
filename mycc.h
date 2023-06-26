@@ -154,4 +154,7 @@ AST *parse_statement(TokenVector *);
 AST *parse_statement_or_declaration(TokenVector *);
 AST *parse_function(TokenVector *);
 AST *parse_ast(TokenVector *);
+
+/* codegen.c */
+void codegen(AST *);
 #endif

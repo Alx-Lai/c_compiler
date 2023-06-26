@@ -374,3 +374,7 @@ void fail(char *filename, int line_number) {
   errf("Fail at %s line:%d\n", filename, line_number);
   exit(0);
 }
+
+void fail_if(char *filename, int line_number, bool flag) {
+  if (flag) fail(filename, line_number);
+}

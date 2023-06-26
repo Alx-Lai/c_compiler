@@ -28,6 +28,7 @@ int main() {
 ```
 
 ## Known Bugs
+- Memory Leak (To be fixed with further code refactor)
 
 
 ## Reference

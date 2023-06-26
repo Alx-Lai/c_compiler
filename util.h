@@ -41,6 +41,7 @@ int get_precedence(Token);
 void print_lex(TokenVector *);
 void print_ast(AST *);
 void fail(char *, int);
+void fail_if(char *, int, bool);
 #define errf(...) fprintf(stderr, __VA_ARGS__)
 
 #endif
