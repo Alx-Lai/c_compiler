@@ -74,6 +74,7 @@ enum ASTType {
   AST_variable,
   AST_if,
   AST_ternary,
+  AST_compound,
 };
 
 struct AST;
@@ -129,6 +130,11 @@ typedef struct AST {
     /* if statement or ternary expression distinguish with ast_type */
     struct {
       struct AST *condition, *if_body, *else_body;
+    };
+
+    /* Compound Statement */
+    struct {
+      ASTVector *statements;
     };
   };
 } AST;

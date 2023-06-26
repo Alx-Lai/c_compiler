@@ -190,8 +190,11 @@ void print_lex(TokenVector *tokens) {
     puts("");
   }
 }
+
+/* todo move to header file */
 AST *parse_expression(TokenVector *tokens);
 AST *parse_assignment_or_expression(TokenVector *tokens);
+AST *parse_statement_or_declaration(TokenVector *tokens);
 
 AST *parse_unary_expression(TokenVector *tokens) {
   errf("call parse_unary_expression id:%d\n", getpos_token());
@@ -401,6 +404,20 @@ AST *parse_statement(TokenVector *tokens) {
         .condition = condition,
         .if_body = if_body,
         .else_body = else_body,
+    };
+  } else if (is_punctuation(peek_token(tokens), '{')) {
+    /* compound statements */
+    /* { */
+    next_token(tokens);
+    ASTVector *vec = init_AST_vector();
+    while(!is_punctuation(peek_token(tokens), '}')) {
+      push_back_AST(vec, parse_statement_or_declaration(tokens));
+    }
+    /* } */
+    next_token(tokens);
+    *ret = (AST){
+      .ast_type = AST_compound,
+      .statements = vec,
     };
   } else {
     /* expression */
@@ -795,7 +812,7 @@ void print_ast(AST *ast) {
       printf("int %s() {\n", ast->func_name);
       for (int i = 0; i < ast->body->size; i++) {
         print_ast(ast->body->arr[i]);
-        if (ast->body->arr[i]->ast_type != AST_if)
+        if (ast->body->arr[i]->ast_type != AST_if && ast->body->arr[i]->ast_type != AST_compound)
           printf(";\n");
         else
           printf("\n");
@@ -862,15 +879,15 @@ void print_ast(AST *ast) {
     case AST_if:
       printf("if (");
       print_ast(ast->condition);
-      printf(") {\n");
+      printf(")\n");
       print_ast(ast->if_body);
-      if (ast->if_body->ast_type != AST_if) printf(";\n");
-      printf("}");
+      if (ast->if_body->ast_type != AST_if && ast->if_body->ast_type != AST_compound) printf(";\n");
+      else printf("\n");
       if (ast->else_body) {
-        printf(" else {\n");
+        printf(" else \n");
         print_ast(ast->else_body);
-        if (ast->else_body->ast_type != AST_if) printf(";\n");
-        printf("}\n");
+        if (ast->else_body->ast_type != AST_if && ast->else_body->ast_type != AST_compound) printf(";\n");
+        else printf("\n");
       } else {
         printf("\n");
       }
@@ -881,6 +898,15 @@ void print_ast(AST *ast) {
       print_ast(ast->if_body);
       printf(" : ");
       print_ast(ast->else_body);
+      break;
+    case AST_compound:
+      printf("{\n");
+      for(int i=0;i<ast->statements->size;i++){
+        print_ast(ast->statements->arr[i]);
+        if (ast->statements->arr[i]->ast_type != AST_if && ast->statements->arr[i]->ast_type != AST_compound) printf(";\n");
+        else printf("\n");
+      }
+      printf("\n}");
       break;
     default:
       fail(__LINE__);
@@ -909,5 +935,5 @@ int main(int argc, char *argv[]) {
   AST *ast = parse_ast(tokens);
   print_ast(ast);
   /* output assembly */
-  output_program(ast);
+  // output_program(ast);
 }
