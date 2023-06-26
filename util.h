@@ -1,4 +1,5 @@
 #include <stdbool.h>
+#include <stdio.h>
 
 #include "mycc.h"
 
@@ -21,20 +22,25 @@ Token peek_token(TokenVector *);
 Token next_token(TokenVector *);
 void back_token();
 int getpos_token();
+int get_variable_offset(VariableVector *, char *);
 
 /* util */
 char assign_to_origin(char);  // += to +
 Token init_token(enum TokenType, uintptr_t);
-Token init_punctuation(char);
-Token init_keyword(enum KeywordType);
-Token init_identifier(char *);
+#define init_punctuation(ch) init_token(PUNCTUATION, (uintptr_t)ch)
+#define init_keyword(type) init_token(KEYWORD, (uintptr_t)type)
+#define init_identifier(str) init_token(IDENTIFIER, (uintptr_t)str)
 bool is_punctuation(Token, char);
 bool is_assignment(Token);
 bool is_keyword(Token, enum KeywordType);
 int get_label_counter();
 bool is_binary_op(Token);
-void fail(int);
 int get_precedence(Token);
-enum KeywordType parse_keyword(char *);
+
+/* debug related */
+void print_lex(TokenVector *);
+void print_ast(AST *);
+void fail(char *, int);
+#define errf(...) fprintf(stderr, __VA_ARGS__)
 
 #endif

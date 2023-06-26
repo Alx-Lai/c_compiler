@@ -6,6 +6,14 @@
 
 static char buf[BUF_SIZE];
 
+static enum KeywordType parse_keyword(char *word) {
+  if (!strcmp(word, "return")) return KEYWORD_return;
+  if (!strcmp(word, "int")) return KEYWORD_int;
+  if (!strcmp(word, "if")) return KEYWORD_if;
+  if (!strcmp(word, "else")) return KEYWORD_else;
+  return KEYWORD_unknown;
+};
+
 void lex(TokenVector *tokens, char code[]) {
   /* TODO: code + code_counter to a vector */
   int code_counter = 0, word_counter = 0;

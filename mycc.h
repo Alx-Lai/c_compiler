@@ -58,8 +58,6 @@ enum KeywordType {
 #define BUF_SIZE 0x200
 void lex(TokenVector *tokens, char code[]);
 
-/* lexer end */
-
 /* parser */
 typedef struct Variable {
   char *name;
@@ -147,4 +145,13 @@ typedef struct AST {
   };
 } AST;
 
+/* parser.c */
+AST *parse_unary_expression(TokenVector *tokens);
+AST *parse_expression(TokenVector *tokens);
+AST *parse_conditional_expression(TokenVector *tokens);
+AST *parse_assignment_or_expression(TokenVector *tokens);
+AST *parse_statement(TokenVector *tokens);
+AST *parse_statement_or_declaration(TokenVector *tokens);
+AST *parse_function(TokenVector *tokens);
+AST *parse_ast(TokenVector *tokens);
 #endif
