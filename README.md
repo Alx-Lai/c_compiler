@@ -10,11 +10,12 @@ make # compile with gcc
 ```
 
 ## Support syntax
-- declare int variables
-- arithmetic expression and assignment
+- declare int variables and assignment of variables
+- arithmetic expression including ternary, binary, and unary operator
 - keyword return
-- support one statement if and ternary operation
-- **haven't** support `,`
+- support compound statements for keyword if-else
+- support pure compound statements
+- **haven't** support `,`, `++` and `--`
 ### Example
 ```
 int main() {
