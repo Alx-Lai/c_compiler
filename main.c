@@ -9,10 +9,9 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "typing.h"
+#include "mycc.h"
 #include "util.h"
 #define MAX_CODE 0x1000
-#define BUF_SIZE 0x200
 
 char code[MAX_CODE];
 char buf[BUF_SIZE];
@@ -25,155 +24,6 @@ int get_variable_offset(char *name) {
     if (!strcmp(name, variables->arr[i].name)) return variables->arr[i].offset;
   }
   return -1;
-}
-
-void lex(TokenVector *tokens, char code[]) {
-  /* TODO: code + code_counter to a vector */
-  int code_counter = 0, word_counter = 0;
-  while (code[code_counter]) {
-    switch (code[code_counter]) {
-      case '{':
-      case '}':
-      case '(':
-      case ')':
-      case ';':
-      case '~':
-      case ':':
-      case '?':
-        push_back_token(tokens, init_punctuation(code[code_counter]));
-        code_counter++;
-        break;
-      case '+':
-      case '-':
-      case '*':
-      case '/':
-      case '%':
-      case '^':
-        if (code[code_counter + 1] == '=') {
-          if (code[code_counter] == '+')
-            push_back_token(tokens, init_punctuation(PUNCTUATION_add_equal));
-          else if (code[code_counter] == '-')
-            push_back_token(tokens, init_punctuation(PUNCTUATION_sub_equal));
-          else if (code[code_counter] == '*')
-            push_back_token(tokens, init_punctuation(PUNCTUATION_mul_equal));
-          else if (code[code_counter] == '/')
-            push_back_token(tokens, init_punctuation(PUNCTUATION_div_equal));
-          else if (code[code_counter] == '%')
-            push_back_token(tokens, init_punctuation(PUNCTUATION_mod_equal));
-          else if (code[code_counter] == '^')
-            push_back_token(tokens,
-                            init_punctuation(PUNCTUATION_bitwise_xor_equal));
-          code_counter += 2;
-        } else {
-          push_back_token(tokens, init_punctuation(code[code_counter]));
-          code_counter++;
-        }
-        break;
-      case '!':
-        if (code[code_counter + 1] == '=') {
-          push_back_token(tokens, init_punctuation(PUNCTUATION_not_equal));
-          code_counter++;
-        } else {
-          push_back_token(tokens, init_punctuation(code[code_counter]));
-        }
-        code_counter++;
-        break;
-      case '>':
-      case '<':
-        if (code[code_counter] == code[code_counter + 1] &&
-            code[code_counter + 2] == '=') {
-          /* >>= <<= */
-          if (code[code_counter] == '>') {
-            push_back_token(tokens,
-                            init_punctuation(PUNCTUATION_shift_right_equal));
-          } else if (code[code_counter] == '<') {
-            push_back_token(tokens,
-                            init_punctuation(PUNCTUATION_shift_left_equal));
-          }
-          code_counter += 3;
-        } else if (code[code_counter] == code[code_counter + 1]) {
-          /* >> << */
-          if (code[code_counter] == '>') {
-            push_back_token(tokens,
-                            init_punctuation(PUNCTUATION_bitwise_shift_right));
-          } else if (code[code_counter] == '<') {
-            push_back_token(tokens,
-                            init_punctuation(PUNCTUATION_bitwise_shift_left));
-          }
-          code_counter += 2;
-        } else if (code[code_counter + 1] == '=') {
-          /* >= <= */
-          if (code[code_counter] == '>') {
-            push_back_token(tokens,
-                            init_punctuation(PUNCTUATION_greater_equal));
-          } else if (code[code_counter] == '<') {
-            push_back_token(tokens, init_punctuation(PUNCTUATION_less_equal));
-          }
-          code_counter += 2;
-        } else {
-          /* > < */
-          push_back_token(tokens, init_punctuation(code[code_counter]));
-          code_counter++;
-        }
-        break;
-      case '=':
-      case '&':
-      case '|':
-        if (code[code_counter + 1] == code[code_counter]) {
-          if (code[code_counter] == '&')
-            push_back_token(tokens, init_punctuation(PUNCTUATION_logical_and));
-          else if (code[code_counter] == '|')
-            push_back_token(tokens, init_punctuation(PUNCTUATION_logical_or));
-          else if (code[code_counter] == '=')
-            push_back_token(tokens, init_punctuation(PUNCTUATION_equal));
-          code_counter += 2;
-        } else if (code[code_counter + 1] == '=') {
-          /* &= |= */
-          if (code[code_counter] == '&') {
-            push_back_token(tokens,
-                            init_punctuation(PUNCTUATION_bitwise_and_equal));
-          } else if (code[code_counter] == '|') {
-            push_back_token(tokens,
-                            init_punctuation(PUNCTUATION_bitwise_or_equal));
-          }
-          code_counter += 2;
-        } else {
-          push_back_token(tokens, init_punctuation(code[code_counter]));
-          code_counter++;
-        }
-        break;
-      case '\n':
-      case ' ':
-      case '\t':
-      case '\r':
-        code_counter++;
-        break;
-      default:
-        word_counter = 0;
-        if (isalpha(code[code_counter])) {
-          do {
-            buf[word_counter++] = code[code_counter++];
-          } while (isalnum(code[code_counter]));
-          buf[word_counter] = '\0';
-          char *name = (char *)malloc((word_counter + 1) * sizeof(char));
-          strcpy(name, buf);
-          int keyword_type = parse_keyword(buf);
-          if (keyword_type != KEYWORD_unknown) {
-            push_back_token(tokens, init_keyword(keyword_type));
-          } else {
-            push_back_token(tokens, init_identifier(name));
-          }
-        } else if (isdigit(code[code_counter])) {
-          do {
-            buf[word_counter++] = code[code_counter++];
-          } while (isdigit(code[code_counter]));
-          buf[word_counter] = '\0';
-          char *name = (char *)malloc((word_counter + 1) * sizeof(char));
-          strcpy(name, buf);
-          push_back_token(tokens, init_token(LITERAL, (uintptr_t)name));
-        }
-    }
-  }
 }
 
 void print_lex(TokenVector *tokens) {
@@ -410,14 +260,14 @@ AST *parse_statement(TokenVector *tokens) {
     /* { */
     next_token(tokens);
     ASTVector *vec = init_AST_vector();
-    while(!is_punctuation(peek_token(tokens), '}')) {
+    while (!is_punctuation(peek_token(tokens), '}')) {
       push_back_AST(vec, parse_statement_or_declaration(tokens));
     }
     /* } */
     next_token(tokens);
     *ret = (AST){
-      .ast_type = AST_compound,
-      .statements = vec,
+        .ast_type = AST_compound,
+        .statements = vec,
     };
   } else {
     /* expression */
@@ -812,7 +662,8 @@ void print_ast(AST *ast) {
       printf("int %s() {\n", ast->func_name);
       for (int i = 0; i < ast->body->size; i++) {
         print_ast(ast->body->arr[i]);
-        if (ast->body->arr[i]->ast_type != AST_if && ast->body->arr[i]->ast_type != AST_compound)
+        if (ast->body->arr[i]->ast_type != AST_if &&
+            ast->body->arr[i]->ast_type != AST_compound)
           printf(";\n");
         else
           printf("\n");
@@ -881,13 +732,19 @@ void print_ast(AST *ast) {
       print_ast(ast->condition);
       printf(")\n");
       print_ast(ast->if_body);
-      if (ast->if_body->ast_type != AST_if && ast->if_body->ast_type != AST_compound) printf(";\n");
-      else printf("\n");
+      if (ast->if_body->ast_type != AST_if &&
+          ast->if_body->ast_type != AST_compound)
+        printf(";\n");
+      else
+        printf("\n");
       if (ast->else_body) {
         printf(" else \n");
         print_ast(ast->else_body);
-        if (ast->else_body->ast_type != AST_if && ast->else_body->ast_type != AST_compound) printf(";\n");
-        else printf("\n");
+        if (ast->else_body->ast_type != AST_if &&
+            ast->else_body->ast_type != AST_compound)
+          printf(";\n");
+        else
+          printf("\n");
       } else {
         printf("\n");
       }
@@ -901,10 +758,13 @@ void print_ast(AST *ast) {
       break;
     case AST_compound:
       printf("{\n");
-      for(int i=0;i<ast->statements->size;i++){
+      for (int i = 0; i < ast->statements->size; i++) {
         print_ast(ast->statements->arr[i]);
-        if (ast->statements->arr[i]->ast_type != AST_if && ast->statements->arr[i]->ast_type != AST_compound) printf(";\n");
-        else printf("\n");
+        if (ast->statements->arr[i]->ast_type != AST_if &&
+            ast->statements->arr[i]->ast_type != AST_compound)
+          printf(";\n");
+        else
+          printf("\n");
       }
       printf("\n}");
       break;

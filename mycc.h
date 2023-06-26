@@ -1,8 +1,8 @@
 #include <stdint.h>
 #include <string.h>
 
-#ifndef MY_TYPING_H
-#define MY_TYPING_H
+#ifndef MY_CC_H
+#define MY_CC_H
 
 /* lexer */
 enum TokenType {
@@ -53,6 +53,14 @@ enum KeywordType {
   KEYWORD_else,
   KEYWORD_unknown,
 };
+
+/* lexer.c */
+#define BUF_SIZE 0x200
+void lex(TokenVector *tokens, char code[]);
+
+/* lexer end */
+
+/* parser */
 typedef struct Variable {
   char *name;
   int offset;  // offset on stack
