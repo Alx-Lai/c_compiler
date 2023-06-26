@@ -12,6 +12,7 @@ void push_back_token(TokenVector *, Token);
 
 VariableVector *init_variable_vector();
 void push_back_variable(VariableVector *, Variable);
+void pop_back_variable(VariableVector *);
 
 ASTVector *init_AST_vector();
 void push_back_AST(ASTVector *, struct AST *);
@@ -40,8 +41,11 @@ int get_precedence(Token);
 /* debug related */
 void print_lex(TokenVector *);
 void print_ast(AST *);
-void fail(char *, int);
-void fail_if(char *, int, bool);
 #define errf(...) fprintf(stderr, __VA_ARGS__)
+void _fail(char *, int);
+#define fail() _fail(__FILE__, __LINE__)
+void _fail_if(char *, int, bool);
+#define fail_if(x) _fail_if(__FILE__, __LINE__, (x))
+#define fail_ifn(x) fail_if(!(x))
 
 #endif

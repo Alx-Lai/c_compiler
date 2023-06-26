@@ -1,6 +1,5 @@
 #include "util.h"
 
-#include <assert.h>
 #include <stdlib.h>
 
 /* vector tools */
@@ -19,7 +18,7 @@ void push_back_token(TokenVector *vec, Token t) {
   if (vec->size == vec->capacity) {
     vec->capacity *= 2;
     Token *newarr = (Token *)realloc(vec->arr, vec->capacity * sizeof(Token));
-    assert(newarr);
+    fail_ifn(newarr);
     vec->arr = newarr;
   }
   vec->arr[vec->size++] = t;
@@ -41,10 +40,15 @@ void push_back_variable(VariableVector *vec, Variable v) {
     vec->capacity *= 2;
     Variable *newarr =
         (Variable *)realloc(vec->arr, vec->capacity * sizeof(Variable));
-    assert(newarr);
+    fail_ifn(newarr);
     vec->arr = newarr;
   }
   vec->arr[vec->size++] = v;
+}
+
+void pop_back_variable(VariableVector *vec) {
+  fail_if(vec->size <= 0);
+  vec->size--;
 }
 
 ASTVector *init_AST_vector() {
@@ -62,7 +66,7 @@ void push_back_AST(ASTVector *vec, AST *ast) {
   if (vec->size == vec->capacity) {
     vec->capacity *= 2;
     AST **newarr = (AST **)realloc(vec->arr, vec->capacity * sizeof(AST *));
-    assert(newarr);
+    fail_ifn(newarr);
     vec->arr = newarr;
   }
   vec->arr[vec->size++] = ast;
@@ -76,7 +80,7 @@ Token next_token(TokenVector *vec) { return vec->arr[token_pointer++]; }
 void back_token() { --token_pointer; }
 int getpos_token() { return token_pointer; }
 int get_variable_offset(VariableVector *variables, char *name) {
-  for (int i = 0; i < variables->size; i++) {
+  for (int i = variables->size-1; i >= 0 ; i--) {
     if (!strcmp(name, variables->arr[i].name)) return variables->arr[i].offset;
   }
   return -1;
@@ -254,7 +258,7 @@ void print_ast(AST *ast) {
       printf("%ld", ast->val);
       break;
     case AST_function:
-      assert(ast->type == KEYWORD_int);
+      fail_ifn(ast->type == KEYWORD_int);
       printf("int %s() {\n", ast->func_name);
       for (int i = 0; i < ast->body->size; i++) {
         print_ast(ast->body->arr[i]);
@@ -267,7 +271,7 @@ void print_ast(AST *ast) {
       printf("}\n");
       break;
     case AST_declare:
-      assert(ast->type == KEYWORD_int);
+      fail_ifn(ast->type == KEYWORD_int);
       printf("int %s", ast->decl_name);
       if (ast->decl_init) {
         printf(" = ");
@@ -316,7 +320,7 @@ void print_ast(AST *ast) {
       print_ast(ast->right);
       break;
     case AST_assign:
-      assert(ast->type == KEYWORD_int);
+      fail_ifn(ast->type == KEYWORD_int);
       printf("%s = ", ast->assign_var_name);
       print_ast(ast->assign_ast);
       break;
@@ -365,16 +369,16 @@ void print_ast(AST *ast) {
       printf("\n}");
       break;
     default:
-      fail(__FILE__, __LINE__);
+      fail();
       break;
   }
 }
 
-void fail(char *filename, int line_number) {
+void _fail(char *filename, int line_number) {
   errf("Fail at %s line:%d\n", filename, line_number);
   exit(0);
 }
 
-void fail_if(char *filename, int line_number, bool flag) {
-  if (flag) fail(filename, line_number);
+void _fail_if(char *filename, int line_number, bool flag) {
+  if (flag) _fail(filename, line_number);
 }

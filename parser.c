@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <stdlib.h>
 
 #include "mycc.h"
@@ -27,7 +26,7 @@ AST *parse_unary_expression(TokenVector *tokens) {
     free(ret);
     next_token(tokens);
     ret = parse_assignment_or_expression(tokens);
-    assert(is_punctuation(next_token(tokens), ')'));
+    fail_ifn(is_punctuation(next_token(tokens), ')'));
   } else if (peek_token(tokens).type == IDENTIFIER) {
     /* pure id e.g. ""a"" || (a = 2) */
     char *name = (char *)next_token(tokens).data;
@@ -38,7 +37,7 @@ AST *parse_unary_expression(TokenVector *tokens) {
   } else {
     errf("type:%d %c id:%d\n", peek_token(tokens).type,
          (char)peek_token(tokens).data, getpos_token());
-    fail(__FILE__, __LINE__);
+    fail();
   }
   return ret;
 }
@@ -114,7 +113,7 @@ AST *parse_conditional_expression(TokenVector *tokens) {
     /* ternary operator */
     next_token(tokens);
     AST *if_body = parse_assignment_or_expression(tokens);
-    assert(is_punctuation(next_token(tokens), ':'));
+    fail_ifn(is_punctuation(next_token(tokens), ':'));
     AST *else_body = parse_conditional_expression(tokens);
     AST *ret = (AST *)malloc(sizeof(AST));
     *ret = (AST){
@@ -140,7 +139,7 @@ AST *parse_assignment_or_expression(TokenVector *tokens) {
   if (assignment) {
     /* assignment */
     char *name = (char *)next_token(tokens).data;
-    assert(is_assignment(peek_token(tokens)));
+    fail_ifn(is_assignment(peek_token(tokens)));
     char type = (char)next_token(tokens).data;
     if (type == '=') {
       /* = */
@@ -188,13 +187,13 @@ AST *parse_statement(TokenVector *tokens) {
         .ast_type = AST_return,
         .return_value = parse_assignment_or_expression(tokens),
     };
-    assert(is_punctuation(next_token(tokens), ';'));
+    fail_ifn(is_punctuation(next_token(tokens), ';'));
   } else if (is_keyword(peek_token(tokens), KEYWORD_if)) {
     /* if */
     next_token(tokens);
-    assert(is_punctuation(next_token(tokens), '('));  // (
+    fail_ifn(is_punctuation(next_token(tokens), '('));  // (
     AST *condition = parse_assignment_or_expression(tokens);
-    assert(is_punctuation(next_token(tokens), ')'));  // )
+    fail_ifn(is_punctuation(next_token(tokens), ')'));  // )
     /* now only one statement */
     AST *if_body = parse_statement(tokens);
     AST *else_body = NULL;
@@ -226,7 +225,7 @@ AST *parse_statement(TokenVector *tokens) {
   } else {
     /* expression */
     ret = parse_assignment_or_expression(tokens);
-    assert(is_punctuation(next_token(tokens), ';'));
+    fail_ifn(is_punctuation(next_token(tokens), ';'));
   }
   return ret;
 }
@@ -236,14 +235,14 @@ AST *parse_statement_or_declaration(TokenVector *tokens) {
   if (is_keyword(peek_token(tokens), KEYWORD_int)) {
     /* declare [ and assignment ] */
     next_token(tokens);
-    assert(peek_token(tokens).type == IDENTIFIER);
+    fail_ifn(peek_token(tokens).type == IDENTIFIER);
     char *name = (char *)next_token(tokens).data;
     AST *init_exp = NULL;
     ret = (AST *)malloc(sizeof(AST));
 
     if (!is_punctuation(peek_token(tokens), ';')) {
       // haven't end -> assignment
-      assert(is_punctuation(next_token(tokens), '='));
+      fail_ifn(is_punctuation(next_token(tokens), '='));
       init_exp = parse_assignment_or_expression(tokens);
     }
     *ret = (AST){
@@ -252,7 +251,7 @@ AST *parse_statement_or_declaration(TokenVector *tokens) {
         .decl_name = name,
         .decl_init = init_exp,
     };
-    assert(is_punctuation(next_token(tokens), ';'));
+    fail_ifn(is_punctuation(next_token(tokens), ';'));
   } else {
     /* statement */
     ret = parse_statement(tokens);
@@ -263,19 +262,19 @@ AST *parse_statement_or_declaration(TokenVector *tokens) {
 AST *parse_function(TokenVector *tokens) {
   AST *ret = (AST *)malloc(sizeof(AST));
   /* int */
-  assert(is_keyword(peek_token(tokens), KEYWORD_int));
+  fail_ifn(is_keyword(peek_token(tokens), KEYWORD_int));
   int return_type = (enum KeywordType)next_token(tokens).data;
 
   /* function name */
-  assert(peek_token(tokens).type == IDENTIFIER);
+  fail_ifn(peek_token(tokens).type == IDENTIFIER);
   char *name = (char *)next_token(tokens).data;
 
   /* () */
-  assert(is_punctuation(next_token(tokens), '('));
-  assert(is_punctuation(next_token(tokens), ')'));
+  fail_ifn(is_punctuation(next_token(tokens), '('));
+  fail_ifn(is_punctuation(next_token(tokens), ')'));
 
   /* { */
-  assert(is_punctuation(next_token(tokens), '{'));
+  fail_ifn(is_punctuation(next_token(tokens), '{'));
 
   ASTVector *body = init_AST_vector();
   while (!is_punctuation(peek_token(tokens), '}')) {
@@ -284,7 +283,7 @@ AST *parse_function(TokenVector *tokens) {
   }
 
   /* } */
-  assert(is_punctuation(next_token(tokens), '}'));
+  fail_ifn(is_punctuation(next_token(tokens), '}'));
 
   *ret = (AST){
       .ast_type = AST_function,
@@ -298,6 +297,6 @@ AST *parse_function(TokenVector *tokens) {
 AST *parse_ast(TokenVector *tokens) {
   seek_token(0);
   AST *ret = parse_function(tokens);
-  assert(getpos_token() == tokens->size);
+  fail_ifn(getpos_token() == tokens->size);
   return ret;
 }
