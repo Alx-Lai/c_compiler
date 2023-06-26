@@ -146,12 +146,12 @@ typedef struct AST {
 } AST;
 
 /* parser.c */
-AST *parse_unary_expression(TokenVector *tokens);
-AST *parse_expression(TokenVector *tokens);
-AST *parse_conditional_expression(TokenVector *tokens);
-AST *parse_assignment_or_expression(TokenVector *tokens);
-AST *parse_statement(TokenVector *tokens);
-AST *parse_statement_or_declaration(TokenVector *tokens);
-AST *parse_function(TokenVector *tokens);
-AST *parse_ast(TokenVector *tokens);
+AST *parse_unary_expression(TokenVector *);
+AST *parse_expression(TokenVector *);
+AST *parse_conditional_expression(TokenVector *);
+AST *parse_assignment_or_expression(TokenVector *);
+AST *parse_statement(TokenVector *);
+AST *parse_statement_or_declaration(TokenVector *);
+AST *parse_function(TokenVector *);
+AST *parse_ast(TokenVector *);
 #endif
