@@ -7,7 +7,8 @@
 static FILE *output_f;
 #define outf(...) fprintf(output_f, __VA_ARGS__)
 
-void output_ast(VariableVector *cur_scope, VariableVector *accumulative_scope, AST *ast) {
+void output_ast(VariableVector *cur_scope, VariableVector *accumulative_scope,
+                AST *ast) {
   /* TODO: refactor or clean or refactor the long code*/
   int offset, counter;
   if (ast->ast_type == AST_function) {
@@ -264,24 +265,23 @@ void output_ast(VariableVector *cur_scope, VariableVector *accumulative_scope, A
     }
     outf("push %%rax\n");
     int stack_offset;
-    if(cur_scope->size == 0) stack_offset = -8;
-    else stack_offset = cur_scope->arr[cur_scope->size-1].offset - 8;
-    push_back_variable(
-      cur_scope,
-      (Variable){
-          .name = ast->decl_name,
-          .offset = stack_offset,
-      }
-    );
-    if(accumulative_scope->size == 0) stack_offset = -8;
-    else stack_offset = accumulative_scope->arr[accumulative_scope->size-1].offset - 8;
-    push_back_variable(
-      accumulative_scope,
-      (Variable){
-        .name = ast->decl_name,
-        .offset = stack_offset,
-      }
-    );
+    if (cur_scope->size == 0)
+      stack_offset = -8;
+    else
+      stack_offset = cur_scope->arr[cur_scope->size - 1].offset - 8;
+    push_back_variable(cur_scope, (Variable){
+                                      .name = ast->decl_name,
+                                      .offset = stack_offset,
+                                  });
+    if (accumulative_scope->size == 0)
+      stack_offset = -8;
+    else
+      stack_offset =
+          accumulative_scope->arr[accumulative_scope->size - 1].offset - 8;
+    push_back_variable(accumulative_scope, (Variable){
+                                               .name = ast->decl_name,
+                                               .offset = stack_offset,
+                                           });
 
   } else if (ast->ast_type == AST_assign) {
     output_ast(cur_scope, accumulative_scope, ast->assign_ast);
@@ -305,7 +305,8 @@ void output_ast(VariableVector *cur_scope, VariableVector *accumulative_scope, A
         "_else_%d:\n",
         counter, counter);
     /* no else -> no output */
-    if (ast->else_body) output_ast(cur_scope, accumulative_scope, ast->else_body);
+    if (ast->else_body)
+      output_ast(cur_scope, accumulative_scope, ast->else_body);
     outf("_post_conditional_%d:\n", counter);
   } else if (ast->ast_type == AST_ternary) {
     counter = get_label_counter();
@@ -321,19 +322,21 @@ void output_ast(VariableVector *cur_scope, VariableVector *accumulative_scope, A
         counter, counter);
     output_ast(cur_scope, accumulative_scope, ast->else_body);
     outf("_post_ternary_%d:\n", counter);
-  } else if(ast->ast_type == AST_compound){
+  } else if (ast->ast_type == AST_compound) {
     /* */
     cur_scope = init_variable_vector();
     for (int i = 0; i < ast->statements->size; i++)
       output_ast(cur_scope, accumulative_scope, ast->statements->arr[i]);
-    
+
     /* clean variables */
-    for(int i=0;i<cur_scope->size;i++){
+    for (int i = 0; i < cur_scope->size; i++) {
       pop_back_variable(accumulative_scope);
     }
-    outf("add $%ld, %%rsp\n", 8*cur_scope->size);
+    outf("add $%ld, %%rsp\n", 8 * cur_scope->size);
     /* TODO: free scope */
 
+  } else if (ast->ast_type == AST_NULL) {
+    outf("nop\n");
   } else {
     errf("type:%d", ast->ast_type);
     fail();

@@ -11,6 +11,11 @@ static enum KeywordType parse_keyword(char *word) {
   if (!strcmp(word, "int")) return KEYWORD_int;
   if (!strcmp(word, "if")) return KEYWORD_if;
   if (!strcmp(word, "else")) return KEYWORD_else;
+  if (!strcmp(word, "for")) return KEYWORD_for;
+  if (!strcmp(word, "while")) return KEYWORD_while;
+  if (!strcmp(word, "do")) return KEYWORD_do;
+  if (!strcmp(word, "break")) return KEYWORD_break;
+  if (!strcmp(word, "continue")) return KEYWORD_continue;
   return KEYWORD_unknown;
 };
 

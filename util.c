@@ -80,7 +80,7 @@ Token next_token(TokenVector *vec) { return vec->arr[token_pointer++]; }
 void back_token() { --token_pointer; }
 int getpos_token() { return token_pointer; }
 int get_variable_offset(VariableVector *variables, char *name) {
-  for (int i = variables->size-1; i >= 0 ; i--) {
+  for (int i = variables->size - 1; i >= 0; i--) {
     if (!strcmp(name, variables->arr[i].name)) return variables->arr[i].offset;
   }
   return -1;
@@ -368,17 +368,39 @@ void print_ast(AST *ast) {
       }
       printf("\n}");
       break;
+    case AST_for:
+      printf("for(");
+      if (ast->for_init) print_ast(ast->for_init);
+      printf(";");
+      if (ast->for_control) print_ast(ast->for_control);
+      printf(";");
+      if (ast->for_post) print_ast(ast->for_post);
+      printf(")");
+      print_ast(ast->for_body);
+      break;
+    case AST_while:
+      printf("while(");
+      print_ast(ast->while_control);
+      printf(")");
+      print_ast(ast->while_body);
+      break;
+    case AST_do_while:
+      printf("do\n");
+      print_ast(ast->do_while_body);
+      printf("while(");
+      print_ast(ast->do_while_control);
+      printf(")");
+      break;
+    case AST_break:
+      puts("break;");
+      break;
+    case AST_continue:
+      puts("continue;");
+      break;
+    case AST_NULL:
+      break;
     default:
       fail();
       break;
   }
-}
-
-void _fail(char *filename, int line_number) {
-  errf("Fail at %s line:%d\n", filename, line_number);
-  exit(0);
-}
-
-void _fail_if(char *filename, int line_number, bool flag) {
-  if (flag) _fail(filename, line_number);
 }

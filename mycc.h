@@ -51,6 +51,11 @@ enum KeywordType {
   KEYWORD_int,
   KEYWORD_if,
   KEYWORD_else,
+  KEYWORD_for,
+  KEYWORD_while,
+  KEYWORD_do,
+  KEYWORD_break,
+  KEYWORD_continue,
   KEYWORD_unknown,
 };
 
@@ -81,6 +86,12 @@ enum ASTType {
   AST_if,
   AST_ternary,
   AST_compound,
+  AST_for,
+  AST_while,
+  AST_do_while,
+  AST_break,
+  AST_continue,
+  AST_NULL,
 };
 
 struct AST;
@@ -142,6 +153,24 @@ typedef struct AST {
     struct {
       ASTVector *statements;
     };
+
+    /* for loop */
+    struct {
+      struct AST *for_init, *for_control, *for_post;
+      struct AST *for_body;
+    };
+
+    /* while loop */
+    struct {
+      struct AST *while_control;
+      struct AST *while_body;
+    };
+
+    /* do while loop */
+    struct {
+      struct AST *do_while_body;
+      struct AST *do_while_control;
+    };
   };
 } AST;
 
@@ -151,6 +180,7 @@ AST *parse_expression(TokenVector *);
 AST *parse_conditional_expression(TokenVector *);
 AST *parse_assignment_or_expression(TokenVector *);
 AST *parse_statement(TokenVector *);
+AST *parse_declaration(TokenVector *);
 AST *parse_statement_or_declaration(TokenVector *);
 AST *parse_function(TokenVector *);
 AST *parse_ast(TokenVector *);

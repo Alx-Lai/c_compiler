@@ -1,5 +1,6 @@
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "mycc.h"
 
@@ -42,10 +43,20 @@ int get_precedence(Token);
 void print_lex(TokenVector *);
 void print_ast(AST *);
 #define errf(...) fprintf(stderr, __VA_ARGS__)
-void _fail(char *, int);
-#define fail() _fail(__FILE__, __LINE__)
-void _fail_if(char *, int, bool);
-#define fail_if(x) _fail_if(__FILE__, __LINE__, (x))
-#define fail_ifn(x) fail_if(!(x))
+#define fail()                                        \
+  do {                                                \
+    errf("Fail at %s line:%d\n", __FILE__, __LINE__); \
+    exit(0);                                          \
+  } while (0)
+
+#define fail_if(x)   \
+  do {               \
+    if ((x)) fail(); \
+  } while (0)
+
+#define fail_ifn(x)   \
+  do {                \
+    if (!(x)) fail(); \
+  } while (0)
 
 #endif

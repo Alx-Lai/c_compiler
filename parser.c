@@ -222,6 +222,94 @@ AST *parse_statement(TokenVector *tokens) {
         .ast_type = AST_compound,
         .statements = vec,
     };
+  } else if (is_keyword(peek_token(tokens), KEYWORD_for)) {
+    /* for loop */
+    /* for */
+    next_token(tokens);
+    /* ( */
+    fail_ifn(is_punctuation(next_token(tokens), '('));
+    AST *for_init = NULL;
+    if (is_punctuation(peek_token(tokens), ';')) {
+      /* none */
+      fail_ifn(is_punctuation(next_token(tokens), ';'));
+    } else if (is_keyword(peek_token(tokens), KEYWORD_int)) {
+      /* declare */
+      for_init = parse_declaration(tokens);
+    } else {
+      for_init = parse_assignment_or_expression(tokens);
+      fail_ifn(is_punctuation(next_token(tokens), ';'));
+    }
+    AST *for_control = NULL;
+    if (is_punctuation(peek_token(tokens), ';')) {
+      fail_ifn(is_punctuation(next_token(tokens), ';'));
+    } else {
+      for_control = parse_assignment_or_expression(tokens);
+      fail_ifn(is_punctuation(next_token(tokens), ';'));
+    }
+    AST *for_post = NULL;
+    if (!is_punctuation(peek_token(tokens), ')')) {
+      /* not empty */
+      for_post = parse_assignment_or_expression(tokens);
+    }
+    fail_ifn(is_punctuation(next_token(tokens), ')'));
+    AST *for_body = parse_statement(tokens);
+
+    *ret = (AST){
+        .ast_type = AST_for,
+        .for_init = for_init,
+        .for_control = for_control,
+        .for_post = for_post,
+        .for_body = for_body,
+    };
+  } else if (is_keyword(peek_token(tokens), KEYWORD_while)) {
+    /* while loop */
+    /* while */
+    next_token(tokens);
+    fail_ifn(is_punctuation(next_token(tokens), '('));
+    AST *while_control = parse_assignment_or_expression(tokens);
+    fail_ifn(is_punctuation(next_token(tokens), ')'));
+    AST *while_body = parse_statement(tokens);
+
+    *ret = (AST){
+        .ast_type = AST_while,
+        .while_control = while_control,
+        .while_body = while_body,
+    };
+  } else if (is_keyword(peek_token(tokens), KEYWORD_do)) {
+    /* do while loop */
+    next_token(tokens);
+    AST *do_while_body = parse_statement(tokens);
+    fail_ifn(is_keyword(next_token(tokens), KEYWORD_while));
+    fail_ifn(is_punctuation(next_token(tokens), '('));
+    AST *do_while_control = parse_assignment_or_expression(tokens);
+    fail_ifn(is_punctuation(next_token(tokens), ')'));
+    fail_ifn(is_punctuation(next_token(tokens), ';'));
+
+    *ret = (AST){
+        .ast_type = AST_do_while,
+        .do_while_body = do_while_body,
+        .do_while_control = do_while_control,
+    };
+  } else if (is_keyword(peek_token(tokens), KEYWORD_break)) {
+    /* break */
+    next_token(tokens);
+    fail_ifn(is_punctuation(next_token(tokens), ';'));
+    *ret = (AST){
+        .ast_type = AST_break,
+    };
+  } else if (is_keyword(peek_token(tokens), KEYWORD_continue)) {
+    /* continue */
+    next_token(tokens);
+    fail_ifn(is_punctuation(next_token(tokens), ';'));
+    *ret = (AST){
+        .ast_type = AST_continue,
+    };
+  } else if (is_punctuation(peek_token(tokens), ';')) {
+    /* NULL expression */
+    next_token(tokens);
+    *ret = (AST){
+        .ast_type = AST_NULL,
+    };
   } else {
     /* expression */
     ret = parse_assignment_or_expression(tokens);
@@ -230,28 +318,33 @@ AST *parse_statement(TokenVector *tokens) {
   return ret;
 }
 
+AST *parse_declaration(TokenVector *tokens) {
+  fail_ifn(is_keyword(next_token(tokens), KEYWORD_int));
+  fail_ifn(peek_token(tokens).type == IDENTIFIER);
+  char *name = (char *)next_token(tokens).data;
+  AST *init_exp = NULL;
+  AST *ret = (AST *)malloc(sizeof(AST));
+
+  if (!is_punctuation(peek_token(tokens), ';')) {
+    // haven't end -> assignment
+    fail_ifn(is_punctuation(next_token(tokens), '='));
+    init_exp = parse_assignment_or_expression(tokens);
+  }
+  *ret = (AST){
+      .type = KEYWORD_int,
+      .ast_type = AST_declare,
+      .decl_name = name,
+      .decl_init = init_exp,
+  };
+  fail_ifn(is_punctuation(next_token(tokens), ';'));
+  return ret;
+}
+
 AST *parse_statement_or_declaration(TokenVector *tokens) {
   AST *ret;
   if (is_keyword(peek_token(tokens), KEYWORD_int)) {
     /* declare [ and assignment ] */
-    next_token(tokens);
-    fail_ifn(peek_token(tokens).type == IDENTIFIER);
-    char *name = (char *)next_token(tokens).data;
-    AST *init_exp = NULL;
-    ret = (AST *)malloc(sizeof(AST));
-
-    if (!is_punctuation(peek_token(tokens), ';')) {
-      // haven't end -> assignment
-      fail_ifn(is_punctuation(next_token(tokens), '='));
-      init_exp = parse_assignment_or_expression(tokens);
-    }
-    *ret = (AST){
-        .type = KEYWORD_int,
-        .ast_type = AST_declare,
-        .decl_name = name,
-        .decl_init = init_exp,
-    };
-    fail_ifn(is_punctuation(next_token(tokens), ';'));
+    ret = parse_declaration(tokens);
   } else {
     /* statement */
     ret = parse_statement(tokens);
