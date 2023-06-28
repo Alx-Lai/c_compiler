@@ -18,6 +18,14 @@ void pop_back_variable(VariableVector *);
 ASTVector *init_AST_vector();
 void push_back_AST(ASTVector *, struct AST *);
 
+typedef struct {
+  size_t size, capacity;
+  int *arr;
+} IntVector;
+IntVector *init_int_vector();
+void push_back_int(IntVector *, int);
+void pop_back_int(IntVector *);
+
 /* parser */
 void seek_token(int);
 Token peek_token(TokenVector *);

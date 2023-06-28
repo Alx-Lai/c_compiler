@@ -48,7 +48,7 @@ void push_back_variable(VariableVector *vec, Variable v) {
 
 void pop_back_variable(VariableVector *vec) {
   fail_if(vec->size <= 0);
-  vec->size--;
+  --vec->size;
 }
 
 ASTVector *init_AST_vector() {
@@ -70,6 +70,32 @@ void push_back_AST(ASTVector *vec, AST *ast) {
     vec->arr = newarr;
   }
   vec->arr[vec->size++] = ast;
+}
+
+IntVector *init_int_vector() {
+  IntVector *ret = (IntVector *)malloc(sizeof(IntVector));
+  int *arr = (int *)malloc(2 * sizeof(int));
+  *ret = (IntVector){
+      .size = 0,
+      .capacity = 2,
+      .arr = arr,
+  };
+  return ret;
+}
+
+void push_back_int(IntVector *vec, int num) {
+  if (vec->size == vec->capacity) {
+    vec->capacity *= 2;
+    int *newarr = (int *)realloc(vec->arr, vec->capacity * sizeof(int));
+    fail_ifn(newarr);
+    vec->arr = newarr;
+  }
+  vec->arr[vec->size++] = num;
+}
+
+void pop_back_int(IntVector *vec) {
+  fail_if(vec->size <= 0);
+  --vec->size;
 }
 
 /* parser tools */
