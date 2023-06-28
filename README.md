@@ -12,9 +12,10 @@ make # compile with gcc
 ## Support syntax
 - declare int variables and assignment of variables
 - arithmetic expression including ternary, binary, and unary operator
-- keyword return
-- support compound statements for keyword if-else
-- support pure compound statements
+- keyword `return`, `break`, `continue`
+- support compound statements
+- loops `for`, `while`, `do-while`
+- `if-else` statement
 - **haven't** support `,`, `++` and `--`
 ### Example
 ```
