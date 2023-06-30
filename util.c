@@ -285,16 +285,26 @@ void print_ast(AST *ast) {
       break;
     case AST_function:
       fail_ifn(ast->type == KEYWORD_int);
-      printf("int %s() {\n", ast->func_name);
-      for (int i = 0; i < ast->body->size; i++) {
-        print_ast(ast->body->arr[i]);
-        if (ast->body->arr[i]->ast_type != AST_if &&
-            ast->body->arr[i]->ast_type != AST_compound)
-          printf(";\n");
-        else
-          printf("\n");
+      printf("int %s(", ast->func_name);
+      for (int i = 0; i < ast->parameters->size; i++) {
+        printf("int %s", ast->parameters->arr[i].name);
+        if (i != ast->parameters->size - 1) printf(", ");
       }
-      printf("}\n");
+      printf(")");
+      if (ast->body == NULL) {
+        printf(";\n");
+      } else {
+        printf("{\n");
+        for (int i = 0; i < ast->body->size; i++) {
+          print_ast(ast->body->arr[i]);
+          if (ast->body->arr[i]->ast_type != AST_if &&
+              ast->body->arr[i]->ast_type != AST_compound)
+            printf(";\n");
+          else
+            printf("\n");
+        }
+        printf("}\n");
+      }
       break;
     case AST_declare:
       fail_ifn(ast->type == KEYWORD_int);
@@ -424,6 +434,14 @@ void print_ast(AST *ast) {
       puts("continue;");
       break;
     case AST_NULL:
+      break;
+    case AST_function_call:
+      printf("%s(", ast->call_function);
+      for (int i = 0; i < ast->call_parameters->size; i++) {
+        print_ast(ast->call_parameters->arr[i]);
+        if (i != ast->call_parameters->size - 1) printf(", ");
+      }
+      printf(")");
       break;
     default:
       fail();

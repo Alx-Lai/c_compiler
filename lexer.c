@@ -23,6 +23,7 @@ void lex(TokenVector *tokens, char code[]) {
   /* TODO: code + code_counter to a vector */
   int code_counter = 0, word_counter = 0;
   while (code[code_counter]) {
+    // errf("%d \n", code_counter);
     switch (code[code_counter]) {
       case '{':
       case '}':
@@ -32,6 +33,7 @@ void lex(TokenVector *tokens, char code[]) {
       case '~':
       case ':':
       case '?':
+      case ',':
         push_back_token(tokens, init_punctuation(code[code_counter]));
         code_counter++;
         break;
@@ -142,10 +144,10 @@ void lex(TokenVector *tokens, char code[]) {
         break;
       default:
         word_counter = 0;
-        if (isalpha(code[code_counter])) {
+        if (isalpha(code[code_counter]) || code[code_counter] == '_') {
           do {
             buf[word_counter++] = code[code_counter++];
-          } while (isalnum(code[code_counter]));
+          } while (isalnum(code[code_counter]) || code[code_counter] == '_');
           buf[word_counter] = '\0';
           char *name = (char *)malloc((word_counter + 1) * sizeof(char));
           strcpy(name, buf);

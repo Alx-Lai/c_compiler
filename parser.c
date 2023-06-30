@@ -28,12 +28,33 @@ AST *parse_unary_expression(TokenVector *tokens) {
     ret = parse_assignment_or_expression(tokens);
     fail_ifn(is_punctuation(next_token(tokens), ')'));
   } else if (peek_token(tokens).type == IDENTIFIER) {
-    /* pure id e.g. ""a"" || (a = 2) */
+    /* pure id e.g. ""a"" || (a = 2) or function call */
     char *name = (char *)next_token(tokens).data;
-    *ret = (AST){
-        .ast_type = AST_variable,
-        .var_name = name,
-    };
+    if (is_punctuation(peek_token(tokens), '(')) {
+      /* function call */
+      next_token(tokens);
+      ASTVector *call_parameters = init_AST_vector();
+      while (!is_punctuation(peek_token(tokens), ')')) {
+        AST *parameter = parse_assignment_or_expression(tokens);
+        push_back_AST(call_parameters, parameter);
+        if (is_punctuation(peek_token(tokens), ',')) {
+          next_token(tokens);
+        } else {
+          break;
+        }
+      }
+      fail_ifn(is_punctuation(next_token(tokens), ')'));
+      *ret = (AST){
+          .ast_type = AST_function_call,
+          .call_function = name,
+          .call_parameters = call_parameters,
+      };
+    } else {
+      *ret = (AST){
+          .ast_type = AST_variable,
+          .var_name = name,
+      };
+    }
   } else {
     errf("type:%d %c id:%d\n", peek_token(tokens).type,
          (char)peek_token(tokens).data, getpos_token());
@@ -360,36 +381,94 @@ AST *parse_function(TokenVector *tokens) {
 
   /* function name */
   fail_ifn(peek_token(tokens).type == IDENTIFIER);
-  char *name = (char *)next_token(tokens).data;
+  char *func_name = (char *)next_token(tokens).data;
 
-  /* () */
+  /* ( */
   fail_ifn(is_punctuation(next_token(tokens), '('));
+  VariableVector *parameters = init_variable_vector();
+  /* parameters*/
+  if (is_keyword(peek_token(tokens), KEYWORD_int)) {
+    next_token(tokens);
+    char *para_name = (char *)next_token(tokens).data;
+    push_back_variable(parameters, (Variable){
+                                       .name = para_name,
+                                   });
+    while (is_punctuation(peek_token(tokens), ',')) {
+      next_token(tokens);
+      fail_ifn(is_keyword(next_token(tokens), KEYWORD_int));
+      para_name = (char *)next_token(tokens).data;
+      push_back_variable(parameters, (Variable){
+                                         .name = para_name,
+                                     });
+    }
+  }
+  /* ) */
   fail_ifn(is_punctuation(next_token(tokens), ')'));
 
-  /* { */
-  fail_ifn(is_punctuation(next_token(tokens), '{'));
+  if (is_punctuation(peek_token(tokens), ';')) {
+    /* function declaration */
+    next_token(tokens);
+    *ret = (AST){
+        .ast_type = AST_function,
+        .type = return_type,
+        .func_name = func_name,
+        .parameters = parameters,
+        .body = NULL,
+    };
+    // body == NULL -> declaration
+    // body == {AST_NULL, ...} -> just a empty body
+  } else {
+    /* { */
+    fail_ifn(is_punctuation(next_token(tokens), '{'));
 
-  ASTVector *body = init_AST_vector();
-  while (!is_punctuation(peek_token(tokens), '}')) {
-    AST *statement = parse_statement_or_declaration(tokens);
-    push_back_AST(body, statement);
+    ASTVector *body = init_AST_vector();
+    while (!is_punctuation(peek_token(tokens), '}')) {
+      AST *statement = parse_statement_or_declaration(tokens);
+      push_back_AST(body, statement);
+    }
+
+    /* } */
+    fail_ifn(is_punctuation(next_token(tokens), '}'));
+
+    *ret = (AST){
+        .ast_type = AST_function,
+        .type = return_type,
+        .func_name = func_name,
+        .parameters = parameters,
+        .body = body,
+    };
   }
-
-  /* } */
-  fail_ifn(is_punctuation(next_token(tokens), '}'));
-
-  *ret = (AST){
-      .ast_type = AST_function,
-      .type = return_type,
-      .func_name = name,
-      .body = body,
-  };
   return ret;
 }
 
-AST *parse_ast(TokenVector *tokens) {
+void validate(ASTVector *vec, AST *func) {
+  if (func->body == NULL) {
+    /* declaration */
+    for (int i = 0; i < vec->size; i++) {
+      if (!strcmp(vec->arr[i]->func_name, func->func_name)) {
+        fail_if(vec->arr[i]->parameters->size != func->parameters->size);
+      }
+    }
+  } else {
+    /* definition */
+    for (int i = 0; i < vec->size; i++) {
+      if (!strcmp(vec->arr[i]->func_name, func->func_name)) {
+        // defined
+        fail_if(vec->arr[i]->body != NULL);
+        // different declaration
+        fail_if(vec->arr[i]->parameters->size != func->parameters->size);
+      }
+    }
+  }
+}
+
+ASTVector *parse_ast(TokenVector *tokens) {
   seek_token(0);
-  AST *ret = parse_function(tokens);
-  fail_ifn(getpos_token() == tokens->size);
-  return ret;
+  ASTVector *vec = init_AST_vector();
+  while (getpos_token() != tokens->size) {
+    AST *ret = parse_function(tokens);
+    if (ret->ast_type == AST_function) validate(vec, ret);
+    push_back_AST(vec, ret);
+  }
+  return vec;
 }

@@ -92,6 +92,7 @@ enum ASTType {
   AST_break,
   AST_continue,
   AST_NULL,
+  AST_function_call,
 };
 
 struct AST;
@@ -114,6 +115,7 @@ typedef struct AST {
     /* declare function */
     struct {
       char *func_name;
+      VariableVector *parameters;
       ASTVector *body;
     };
 
@@ -171,6 +173,12 @@ typedef struct AST {
       struct AST *do_while_body;
       struct AST *do_while_control;
     };
+
+    /* function call */
+    struct {
+      char *call_function;
+      ASTVector *call_parameters;
+    };
   };
 } AST;
 
@@ -183,8 +191,8 @@ AST *parse_statement(TokenVector *);
 AST *parse_declaration(TokenVector *);
 AST *parse_statement_or_declaration(TokenVector *);
 AST *parse_function(TokenVector *);
-AST *parse_ast(TokenVector *);
+ASTVector *parse_ast(TokenVector *);
 
 /* codegen.c */
-void codegen(AST *);
+void codegen(ASTVector *);
 #endif

@@ -18,10 +18,12 @@ int main(int argc, char *argv[]) {
 #ifdef DEBUG
   print_lex(tokens);
 #endif
-  AST *ast = parse_ast(tokens);
+  ASTVector *ast_vec = parse_ast(tokens);
 #ifdef DEBUG
-  print_ast(ast);
+  for (int i = 0; i < ast_vec->size; i++) {
+    print_ast(ast_vec->arr[i]);
+  }
 #endif
   /* output assembly */
-  codegen(ast);
+  // codegen(ast_vec);
 }
