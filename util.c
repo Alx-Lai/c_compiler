@@ -262,6 +262,13 @@ int get_precedence(Token token) {
   }
 }
 
+char *new_string(char *str) {
+  int l = strlen(str);
+  char *ret = (char *)malloc((l + 1) * sizeof(char));
+  strcpy(ret, str);
+  return ret;
+}
+
 /* debug related */
 void print_lex(TokenVector *tokens) {
   for (int i = 0; i < tokens->size; i++) {

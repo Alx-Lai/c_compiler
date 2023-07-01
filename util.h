@@ -46,6 +46,7 @@ bool is_keyword(Token, enum KeywordType);
 int get_label_counter();
 bool is_binary_op(Token);
 int get_precedence(Token);
+char *new_string(char *);
 
 /* debug related */
 void print_lex(TokenVector *);

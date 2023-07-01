@@ -17,20 +17,27 @@ make # compile with gcc
 - loops `for`, `while`, `do-while`
 - `if-else` statement
 - **haven't** support `,`, `++` and `--`
+- define function with `int` return type and 0 to many `int` parameters 
+- support call function recursively
 ### Example
 ```
+int fib(int n) {
+  if (n == 0 || n == 1) {
+    return n;
+  } else {
+    return fib(n - 1) + fib(n - 2);
+  }
+}
+
 int main() {
-  int a = 2; // declare variables
-  int b = 1;
-  a += 2;
-  a = a + b;
-  a || (a = 2) || (b = 4);
-  return a;
+  int n = 6;
+  return fib(n);
 }
 ```
 
 ## Known Bugs
 - Memory Leak (To be fixed with further code refactor)
+- no check number of parameter while calling function
 
 
 ## Reference

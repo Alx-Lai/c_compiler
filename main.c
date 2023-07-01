@@ -25,5 +25,5 @@ int main(int argc, char *argv[]) {
   }
 #endif
   /* output assembly */
-  // codegen(ast_vec);
+  codegen(ast_vec);
 }
