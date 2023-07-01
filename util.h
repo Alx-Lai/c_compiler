@@ -48,6 +48,12 @@ bool is_binary_op(Token);
 int get_precedence(Token);
 char *new_string(char *);
 
+/* for memory safe */
+// TODO: to be macro support multi-type
+void init_AST();
+AST *new_AST();
+void free_AST();
+
 /* debug related */
 void print_lex(TokenVector *);
 void print_ast(AST *);

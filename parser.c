@@ -4,7 +4,7 @@
 #include "util.h"
 
 AST *parse_unary_expression(TokenVector *tokens) {
-  AST *ret = (AST *)malloc(sizeof(AST));
+  AST *ret = new_AST();
   /* unary*/
   if (is_punctuation(peek_token(tokens), '-') ||
       is_punctuation(peek_token(tokens), '~') ||
@@ -23,7 +23,6 @@ AST *parse_unary_expression(TokenVector *tokens) {
         .val = atoi((char *)next_token(tokens).data),
     };
   } else if (is_punctuation(peek_token(tokens), '(')) {
-    free(ret);
     next_token(tokens);
     ret = parse_assignment_or_expression(tokens);
     fail_ifn(is_punctuation(next_token(tokens), ')'));
@@ -80,12 +79,12 @@ AST *parse_expression(TokenVector *tokens) {
      *     / \        *   / \
      *    b   c       *  a   b
      */
-    AST *ret = (AST *)malloc(sizeof(AST));
+    AST *ret = new_AST();
     if (is_binary_op(peek_token(tokens))) {
       int pred_back = get_precedence(peek_token(tokens));
       if (pred_front > pred_back) {
         char type2 = (char)next_token(tokens).data;
-        AST *new_right = (AST *)malloc(sizeof(AST));
+        AST *new_right = new_AST();
         *new_right = (AST){
             .ast_type = AST_binary_op,
             .type = type2,
@@ -100,7 +99,7 @@ AST *parse_expression(TokenVector *tokens) {
         };
       } else {
         char type2 = (char)next_token(tokens).data;
-        AST *sub_root = (AST *)malloc(sizeof(AST));
+        AST *sub_root = new_AST();
         *sub_root = (AST){
             .ast_type = AST_binary_op,
             .type = type,
@@ -136,7 +135,7 @@ AST *parse_conditional_expression(TokenVector *tokens) {
     AST *if_body = parse_assignment_or_expression(tokens);
     fail_ifn(is_punctuation(next_token(tokens), ':'));
     AST *else_body = parse_conditional_expression(tokens);
-    AST *ret = (AST *)malloc(sizeof(AST));
+    AST *ret = new_AST();
     *ret = (AST){
         .ast_type = AST_ternary,
         .condition = condition,
@@ -150,7 +149,7 @@ AST *parse_conditional_expression(TokenVector *tokens) {
 }
 
 AST *parse_assignment_or_expression(TokenVector *tokens) {
-  AST *ret = (AST *)malloc(sizeof(AST));
+  AST *ret = new_AST();
   bool assignment = false;
   if (peek_token(tokens).type == IDENTIFIER) {
     next_token(tokens);
@@ -172,8 +171,7 @@ AST *parse_assignment_or_expression(TokenVector *tokens) {
       };
     } else {
       /* += series */
-      AST *rvalue = (AST *)malloc(sizeof(AST)),
-          *var = (AST *)malloc(sizeof(AST));
+      AST *rvalue = new_AST(), *var = new_AST();
       *var = (AST){
           .ast_type = AST_variable,
           .var_name = name,
@@ -200,7 +198,7 @@ AST *parse_assignment_or_expression(TokenVector *tokens) {
 }
 
 AST *parse_statement(TokenVector *tokens) {
-  AST *ret = (AST *)malloc(sizeof(AST));  // TODO: prevent memory leak
+  AST *ret = new_AST();
   if (is_keyword(peek_token(tokens), KEYWORD_return)) {
     /* return value */
     next_token(tokens);
@@ -344,7 +342,7 @@ AST *parse_declaration(TokenVector *tokens) {
   fail_ifn(peek_token(tokens).type == IDENTIFIER);
   char *name = (char *)next_token(tokens).data;
   AST *init_exp = NULL;
-  AST *ret = (AST *)malloc(sizeof(AST));
+  AST *ret = new_AST();
 
   if (!is_punctuation(peek_token(tokens), ';')) {
     // haven't end -> assignment
@@ -374,7 +372,7 @@ AST *parse_statement_or_declaration(TokenVector *tokens) {
 }
 
 AST *parse_function(TokenVector *tokens) {
-  AST *ret = (AST *)malloc(sizeof(AST));
+  AST *ret = new_AST();
   /* int */
   fail_ifn(is_keyword(peek_token(tokens), KEYWORD_int));
   int return_type = (enum KeywordType)next_token(tokens).data;

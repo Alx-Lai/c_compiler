@@ -269,6 +269,22 @@ char *new_string(char *str) {
   return ret;
 }
 
+/* for memory safe */
+static ASTVector *AST_vec;
+void init_AST() { AST_vec = init_AST_vector(); }
+
+AST *new_AST() {
+  AST *ret = (AST *)malloc(sizeof(AST));
+  push_back_AST(AST_vec, ret);
+  return ret;
+}
+
+void free_AST() {
+  for (int i = 0; i < AST_vec->size; i++) free(AST_vec->arr[i]);
+  free(AST_vec->arr);
+  free(AST_vec);
+}
+
 /* debug related */
 void print_lex(TokenVector *tokens) {
   for (int i = 0; i < tokens->size; i++) {

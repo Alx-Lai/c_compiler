@@ -18,6 +18,7 @@ int main(int argc, char *argv[]) {
 #ifdef DEBUG
   print_lex(tokens);
 #endif
+  init_AST();
   ASTVector *ast_vec = parse_ast(tokens);
 #ifdef DEBUG
   for (int i = 0; i < ast_vec->size; i++) {
@@ -26,4 +27,7 @@ int main(int argc, char *argv[]) {
 #endif
   /* output assembly */
   codegen(ast_vec);
+
+  /* clean memory */
+  free_AST();
 }

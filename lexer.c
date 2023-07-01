@@ -149,8 +149,7 @@ void lex(TokenVector *tokens, char code[]) {
             buf[word_counter++] = code[code_counter++];
           } while (isalnum(code[code_counter]) || code[code_counter] == '_');
           buf[word_counter] = '\0';
-          char *name = (char *)malloc((word_counter + 1) * sizeof(char));
-          strcpy(name, buf);
+          char *name = new_string(buf);
           int keyword_type = parse_keyword(buf);
           if (keyword_type != KEYWORD_unknown) {
             push_back_token(tokens, init_keyword(keyword_type));
@@ -162,8 +161,7 @@ void lex(TokenVector *tokens, char code[]) {
             buf[word_counter++] = code[code_counter++];
           } while (isdigit(code[code_counter]));
           buf[word_counter] = '\0';
-          char *name = (char *)malloc((word_counter + 1) * sizeof(char));
-          strcpy(name, buf);
+          char *name = new_string(buf);
           push_back_token(tokens, init_token(LITERAL, (uintptr_t)name));
         }
     }
