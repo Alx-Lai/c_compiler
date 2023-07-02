@@ -439,34 +439,110 @@ AST *parse_function(TokenVector *tokens) {
   return ret;
 }
 
-void validate(ASTVector *vec, AST *func) {
-  if (func->body == NULL) {
-    /* declaration */
+AST *parse_function_or_declaration(TokenVector *tokens) {
+  fail_ifn(is_keyword(next_token(tokens), KEYWORD_int));
+  fail_ifn(peek_token(tokens).type == IDENTIFIER);
+  char *name = (char *)next_token(tokens).data;
+  if (is_punctuation(peek_token(tokens), '(')) {
+    /* function */
+    back_token();
+    back_token();
+    return parse_function(tokens);
+  }
+  /* global variable */
+  AST *ret = new_AST();
+  if (is_punctuation(peek_token(tokens), ';')) {
+    /* declare only */
+    next_token(tokens);
+    *ret = (AST){
+        .ast_type = AST_declare,
+        .type = KEYWORD_int,
+        .decl_name = name,
+        .decl_init = NULL,
+    };
+  } else {
+    /* declare with initial value */
+    AST *sub = new_AST();
+    fail_ifn(is_punctuation(next_token(tokens), '='));
+    fail_ifn(peek_token(tokens).type == LITERAL);
+    // constant required, TODO: eval constant expression
+    *sub = (AST){
+        .ast_type = AST_literal,
+        .type = KEYWORD_int,
+        .val = atoi((char *)next_token(tokens).data),
+    };
+    *ret = (AST){
+        .ast_type = AST_declare,
+        .type = KEYWORD_int,
+        .decl_name = name,
+        .decl_init = sub,
+    };
+    fail_ifn(is_punctuation(next_token(tokens), ';'));
+  }
+  return ret;
+}
+
+static char *get_name(AST *ast) {
+  if (ast->ast_type == AST_function)
+    return ast->func_name;
+  else if (ast->ast_type == AST_declare)
+    return ast->decl_name;
+  else
+    fail();
+}
+
+static bool is_defined(AST *ast) {
+  if (ast->ast_type == AST_function)
+    return (ast->body != NULL);
+  else if (ast->ast_type == AST_declare)
+    return (ast->decl_init != NULL);
+  else
+    fail();
+}
+
+bool validate(ASTVector *vec, AST *ast) {
+  char *name = get_name(ast);
+  bool defined = is_defined(ast);
+  bool update = false;
+
+  if (defined) {
     for (int i = 0; i < vec->size; i++) {
-      if (!strcmp(vec->arr[i]->func_name, func->func_name)) {
-        fail_if(vec->arr[i]->parameters->size != func->parameters->size);
+      errf("%d %d\n", vec->arr[i]->ast_type, ast->ast_type);
+      errf("%s %s\n", get_name(vec->arr[i]), name);
+      if (!strcmp(get_name(vec->arr[i]), name)) {
+        // different type
+        fail_if(vec->arr[i]->ast_type != ast->ast_type);
+        // double defined
+        fail_if(is_defined(vec->arr[i]));
+        // move to initialized variable
+        if (ast->ast_type == AST_declare) {
+          vec->arr[i]->decl_init = ast->decl_init;
+          update = true;
+        }
       }
     }
   } else {
-    /* definition */
     for (int i = 0; i < vec->size; i++) {
-      if (!strcmp(vec->arr[i]->func_name, func->func_name)) {
-        // defined
-        fail_if(vec->arr[i]->body != NULL);
-        // different declaration
-        fail_if(vec->arr[i]->parameters->size != func->parameters->size);
+      if (!strcmp(get_name(vec->arr[i]), name)) {
+        // different type
+        fail_if(vec->arr[i]->ast_type != ast->ast_type);
+        // different parameter count
+        fail_if(vec->arr[i]->ast_type == AST_function &&
+                ast->ast_type == AST_function &&
+                vec->arr[i]->parameters->size != ast->parameters->size);
       }
     }
   }
+  return update;
 }
 
 ASTVector *parse_ast(TokenVector *tokens) {
   seek_token(0);
   ASTVector *vec = init_AST_vector();
   while (getpos_token() != tokens->size) {
-    AST *ret = parse_function(tokens);
-    if (ret->ast_type == AST_function) validate(vec, ret);
-    push_back_AST(vec, ret);
+    AST *ret = parse_function_or_declaration(tokens);
+    bool updated = validate(vec, ret);
+    if (!updated) push_back_AST(vec, ret);
   }
   return vec;
 }

@@ -320,11 +320,6 @@ void print_ast(AST *ast) {
         printf("{\n");
         for (int i = 0; i < ast->body->size; i++) {
           print_ast(ast->body->arr[i]);
-          if (ast->body->arr[i]->ast_type != AST_if &&
-              ast->body->arr[i]->ast_type != AST_compound)
-            printf(";\n");
-          else
-            printf("\n");
         }
         printf("}\n");
       }
@@ -336,10 +331,12 @@ void print_ast(AST *ast) {
         printf(" = ");
         print_ast(ast->decl_init);
       }
+      printf(";\n");
       break;
     case AST_return:
       printf("return ");
       print_ast(ast->return_value);
+      printf(";\n");
       break;
     case AST_unary_op:
       switch (ast->type) {
@@ -391,22 +388,12 @@ void print_ast(AST *ast) {
       print_ast(ast->condition);
       printf(")\n");
       print_ast(ast->if_body);
-      if (ast->if_body->ast_type != AST_if &&
-          ast->if_body->ast_type != AST_compound)
-        printf(";\n");
-      else
-        printf("\n");
+      printf("\n");
       if (ast->else_body) {
         printf(" else \n");
         print_ast(ast->else_body);
-        if (ast->else_body->ast_type != AST_if &&
-            ast->else_body->ast_type != AST_compound)
-          printf(";\n");
-        else
-          printf("\n");
-      } else {
-        printf("\n");
       }
+      printf("\n");
       break;
     case AST_ternary:
       print_ast(ast->condition);
@@ -419,13 +406,8 @@ void print_ast(AST *ast) {
       printf("{\n");
       for (int i = 0; i < ast->statements->size; i++) {
         print_ast(ast->statements->arr[i]);
-        if (ast->statements->arr[i]->ast_type != AST_if &&
-            ast->statements->arr[i]->ast_type != AST_compound)
-          printf(";\n");
-        else
-          printf("\n");
       }
-      printf("\n}");
+      printf("\n}\n");
       break;
     case AST_for:
       printf("for(");
@@ -434,7 +416,7 @@ void print_ast(AST *ast) {
       if (ast->for_control) print_ast(ast->for_control);
       printf(";");
       if (ast->for_post) print_ast(ast->for_post);
-      printf(")");
+      printf(")\n");
       print_ast(ast->for_body);
       break;
     case AST_while:
@@ -448,7 +430,7 @@ void print_ast(AST *ast) {
       print_ast(ast->do_while_body);
       printf("while(");
       print_ast(ast->do_while_control);
-      printf(")");
+      printf(");");
       break;
     case AST_break:
       puts("break;");

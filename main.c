@@ -26,7 +26,7 @@ int main(int argc, char *argv[]) {
   }
 #endif
   /* output assembly */
-  codegen(ast_vec);
+  // codegen(ast_vec);
 
   /* clean memory */
   free_AST();

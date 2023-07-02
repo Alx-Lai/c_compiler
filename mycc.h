@@ -101,6 +101,7 @@ typedef struct {
   struct AST **arr;
 } ASTVector;
 
+// TODO: function is actually a variable
 typedef struct AST {
   int ast_type;
 
